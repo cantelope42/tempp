@@ -550,7 +550,9 @@ const Renderer = async options => {
               
               if(geometry.textureMode == 'canvas'){
                 ctx.activeTexture(ctx.TEXTURE2)
-                BindImage(ctx, geometry.canvasTexture,  dset.texture, geometry.textureMode, renderer.t, geometry)
+                BindImage(ctx, geometry.canvasTexture, dset.supplementalTexture, 'canvas', renderer.t, geometry)
+                ctx.uniform1i(dset.locSupplementalTexture, 2)
+                ctx.uniform1f(dset.locSupplementalTextureMix, geometry.canvasTextureMix)
               }
 
               if(geometry.isLine){  // draw lines or particles

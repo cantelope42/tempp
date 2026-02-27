@@ -4934,7 +4934,6 @@ const BasicShader = async (renderer, options=[]) => {
       uniform vec3 camOri;
       uniform vec3 geoPos;
       uniform vec3 geoOri;
-      float cMix:
       vec4 mixColor;
       vec4 addInColor;
       
@@ -4957,6 +4956,7 @@ const BasicShader = async (renderer, options=[]) => {
       vec3 rgeoPos;
       float rheightMapIntensity;
       float rmaxHeightmap;
+      float cMix;
 
       ${uFragDeclaration}
       ${aFragDeclaration}

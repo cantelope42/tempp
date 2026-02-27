@@ -1,6 +1,6 @@
 // 'Coordinates', a webgl framework
 // Scott McGann - whitehotrobot@gmail.com
-// all rights reserved - ©2025
+// all rights reserved - ©2026
 
 const ModuleBase = 'https://srmcgann.github.io/Coordinates'
 
@@ -547,6 +547,13 @@ const Renderer = async options => {
                 ctx.vertexAttribPointer(dset.locOffset, 3, ctx.FLOAT, false, 0, 0)
                 ctx.enableVertexAttribArray(dset.locOffset)
               }
+              
+              if(geometry.textureMode == 'canvas'){
+                ctx.activeTexture(ctx.TEXTURE2)
+                BindImage(ctx, geometry.canvasTexture, dset.supplementalTexture, 'canvas', renderer.t, geometry)
+                ctx.uniform1i(dset.locSupplementalTexture, 2)
+                ctx.uniform1f(dset.locSupplementalTextureMix, geometry.canvasTextureMix)
+              }
 
               if(geometry.isLine){  // draw lines or particles
                 ctx.drawElements(ctx.TRIANGLES, tvertices.length/3|0, ctx.UNSIGNED_INT,0)
@@ -613,8 +620,6 @@ const Renderer = async options => {
               }
             })
             
-            //ctx.useProgram( sProg )
-            
             ctx.useProgram( sProg )
             
             if(!renderer.hasFog){
@@ -623,221 +628,223 @@ const Renderer = async options => {
             }
 
             dset.optionalUniforms.map((uniform) => {
-              if(typeof uniform?.loc === 'object'){
-                if(uniform.dataType == 'uniform4f'){
-                  ctx[uniform.dataType](uniform.loc, ...uniform.value)
-                }else{
-                  ctx[uniform.dataType](uniform.loc, uniform.value)
-                }
-                uniform.locFlatShading = ctx.getUniformLocation(dset.program, uniform.flatShadingUniform)
-                ctx.uniform1f(uniform.locFlatShading,   uniform.flatShading ? 1.0 : 0.0)
-                switch(uniform.name){
-                  case 'fog':
-                    ctx.uniform1f(dset.locFog, uniform.value)
-                    ctx.uniform3f(dset.locFogColor, ...HexToRGB(uniform.color))
-                  break
-                  case 'reflection':
-                    ctx.activeTexture(ctx.TEXTURE1)
-                    if(uniform.canvasTexture){
-                      if(typeof uniform.refTexture == 'undefined'){
-                        uniform.refTexture = ctx.createTexture()
-                      }
-                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refTexture)
-                      BindImage(ctx, uniform.canvasTexture,  uniform.refTexture,'canvas', renderer.t, uniform)
-                    }else{
-                      if(uniform.textureMode == 'image' && uniform.rebindTextures){
-                        uniform.rebindTextures = false
-                        console.log('rebinding reflection texture')
-                        if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
-                           !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
-                          var image = new Image()
+              if(uniform.enabled){
+                if(typeof uniform?.loc === 'object'){
+                  if(uniform.dataType == 'uniform4f'){
+                    ctx[uniform.dataType](uniform.loc, ...uniform.value)
+                  }else{
+                    ctx[uniform.dataType](uniform.loc, uniform.value)
+                  }
+                  uniform.locFlatShading = ctx.getUniformLocation(dset.program, uniform.flatShadingUniform)
+                  ctx.uniform1f(uniform.locFlatShading,   uniform.flatShading ? 1.0 : 0.0)
+                  switch(uniform.name){
+                    case 'fog':
+                      ctx.uniform1f(dset.locFog, uniform.value)
+                      ctx.uniform3f(dset.locFogColor, ...HexToRGB(uniform.color))
+                    break
+                    case 'reflection':
+                      ctx.activeTexture(ctx.TEXTURE1)
+                      if(uniform.canvasTexture){
+                        if(typeof uniform.refTexture == 'undefined'){
                           uniform.refTexture = ctx.createTexture()
-                          uniform.image = image
-                          cache.textures.push({
-                            url: uniform.map,
-                            resource: image,
-                            texture: uniform.refTexture
-                          })
-                          image.onload = async () => {
-                            ctx.activeTexture(ctx.TEXTURE1)
-                            BindImage(ctx, uniform.image,
-                            uniform.refTexture, uniform.textureMode, renderer.t, uniform)
-                          }
-                          fetch(uniform.map).then(res=>res.blob()).then(data => {
-                            image.src = URL.createObjectURL(data)
-                          })
-                          
-                        }else{
-                          console.log('resource found in cache. using it')
-                          cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
-                          uniform.image = cacheItem.resource
-                          uniform.refTexture = ctx.createTexture() //cacheItem.texture
-                          BindImage(ctx, uniform.image,
-                            uniform.refTexture, uniform.textureMode, renderer.t, uniform)
                         }
-                      }
-                      if(uniform.textureMode == 'video'){
-                         BindImage(ctx, uniform.video,  uniform.refTexture, uniform.textureMode, renderer.t, uniform)
-                      }
-                    }
-                    ctx.activeTexture(ctx.TEXTURE1)
-                    ctx.uniform1i(uniform.locRefTexture, 1)
-                    ctx.uniform1f(uniform.locRefTheta, uniform.theta)
-                    ctx.bindTexture(ctx.TEXTURE_2D, uniform.refTexture)
-                    
-                    ctx.uniform1f(uniform.locRefOmitEquirectangular,
-                         ( geometry.shapeType == 'rectangle' ||
-                           geometry.shapeType == 'point light' ||
-                           geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
-                  break
-                  case 'refraction':
-                    ctx.activeTexture(ctx.TEXTURE5)
-                    if(uniform.canvasTexture){
-                      if(typeof uniform.refractionTexture == 'undefined'){
-                        uniform.refractionTexture = ctx.createTexture()
-                      }
-                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refractionTexture)
-                      BindImage(ctx, uniform.canvasTexture,  uniform.refractionTexture, 'canvas', renderer.t, uniform)
-                    }else{
-                      if(uniform.textureMode == 'image' && uniform.rebindTextures){
-                        uniform.rebindTextures = false
-                        if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
-                           !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
-                          var image = new Image()
-                          uniform.refractionTexture = ctx.createTexture()
-                          uniform.image = image
-                          cache.textures.push({
-                            url: uniform.map,
-                            resource: image,
-                            texture: uniform.refractionTexture
-                          })
-                          image.onload = async () => {
-                            ctx.activeTexture(ctx.TEXTURE5)
-                            BindImage(ctx, uniform.image,
-                            uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
-                          }
-                          fetch(uniform.map).then(res=>res.blob()).then(data => {
-                            image.src = URL.createObjectURL(data)
-                          })
-                          
-                        }else{
-                          console.log('resource found in cache. using it')
-                          cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
-                          uniform.image = cacheItem.resource
-                          uniform.refractionTexture= ctx.createTexture() //cacheItem.texture
-                          BindImage(ctx, uniform.image,
-                            uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
-                        }
-                      }
-                      if(uniform.textureMode == 'video'){
-                         BindImage(ctx, uniform.video,  uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
-                      }
-                    }
-                    ctx.activeTexture(ctx.TEXTURE5)
-                    ctx.uniform1i(uniform.locRefractionTexture, 5)
-                    ctx.uniform1f(uniform.locRefractionTheta, uniform.theta)
-                    
-                    ctx.bindTexture(ctx.TEXTURE_2D, uniform.refractionTexture)
-                    
-                    ctx.uniform1f(uniform.locAngleOfRefraction,
-                         uniform.angleOfRefraction)
-                           
-                    ctx.uniform1f(uniform.locRefractionOmitEquirectangular,
-                         ( geometry.shapeType == 'rectangle' ||
-                           geometry.shapeType == 'point light' ||
-                           geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
-
-                  break
-                  case 'refraction2':
-                    ctx.activeTexture(ctx.TEXTURE6)
-                    if(uniform.canvasTexture){
-                      if(typeof uniform.refraction2Texture == 'undefined'){
-                        uniform.refraction2Texture = ctx.createTexture()
-                      }
-                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refraction2Texture)
-                      BindImage(ctx, uniform.canvasTexture,  uniform.refraction2Texture, 'canvas', renderer.t, uniform)
-                    }else{
-                      if(uniform.textureMode == 'image' && uniform.rebindTextures){
-                        uniform.rebindTextures = false
-                        if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
-                           !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
-                          var image = new Image()
-                          uniform.refraction2Texture = ctx.createTexture()
-                          uniform.image = image
-                          cache.textures.push({
-                            url: uniform.map,
-                            resource: image,
-                            texture: uniform.refraction2Texture
-                          })
-                          image.onload = async () => {
-                            ctx.activeTexture(ctx.TEXTURE6)
-                            BindImage(ctx, uniform.image,
-                            uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
-                          }
-                          fetch(uniform.map).then(res=>res.blob()).then(data => {
-                            image.src = URL.createObjectURL(data)
-                          })
-                          
-                        }else{
-                          console.log('resource found in cache. using it')
-                          cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
-                          uniform.image = cacheItem.resource
-                          uniform.refraction2Texture= ctx.createTexture() //cacheItem.texture
-                          BindImage(ctx, uniform.image,
-                            uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
-                        }
-                      }
-                      if(uniform.textureMode == 'video'){
-                         BindImage(ctx, uniform.video,  uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
-                      }
-                    }
-                    ctx.activeTexture(ctx.TEXTURE6)
-                    
-                    uniform.locRefractionOmitEquirectangular = 
-                       ctx.getUniformLocation(dset.program, "refraction2OmitEquirectangular")
-                    ctx.uniform1f(uniform.locRefractionOmitEquirectangular,
-                                     uniform.omitEquirectangular ? 1 : 0)
-                    
-                    
-                    ctx.uniform1i(uniform.locRefraction2Texture, 6)
-                    ctx.uniform1f(uniform.locRefraction2Theta, uniform.theta)
-                    
-                    ctx.bindTexture(ctx.TEXTURE_2D, uniform.refraction2Texture)
-
-                    uniform.locRefractionExponent = ctx.getUniformLocation(dset.program, 'refractionExponent2')
-                    ctx.uniform1f(uniform.locRefractionExponent,
-                                     uniform.refractionExponent)
-                    
-                    ctx.uniform1f(uniform.locAngleOfRefraction2,
-                         uniform.angleOfRefraction)
-                           
-                    ctx.uniform1f(uniform.locRefraction2OmitEquirectangular,
-                         ( geometry.shapeType == 'rectangle' ||
-                           geometry.shapeType == 'point light' ||
-                           geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
-
-                    
-                  break
-                  case 'phong':
-                    uniform.locPhongTheta = ctx.getUniformLocation(dset.program, 'phongTheta')
-                    ctx.uniform1f(uniform.locPhongTheta, uniform.theta + Math.PI)
-                    //ctx.uniform1f(uniform.locPhongFlatShading, uniform.theta + Math.PI)
-                  break
-                  case 'custom':
-                    if(uniform.uniformName){
-                      var ar = uniform.value
-                      if(uniform.uniformName.indexOf('[0]') != -1){ // if uniform value is an array
-                      //if(IsArray(ar)){
-                        uniform.locCustomUniform =
-                           ctx.getUniformLocation(dset.program, uniform.uniformName)
-                        ctx[uniform.dataType](uniform.locCustomUniform, uniform.value)
+                        ctx.bindTexture(ctx.TEXTURE_2D, uniform.refTexture)
+                        BindImage(ctx, uniform.canvasTexture,  uniform.refTexture,'canvas', renderer.t, uniform)
                       }else{
-                        uniform.locCustomUniform =
-                           ctx.getUniformLocation(dset.program, uniform.uniformName)
-                        ctx[uniform.dataType](uniform.locCustomUniform, ...uniform.value)
+                        if(uniform.textureMode == 'image' && uniform.rebindTextures){
+                          uniform.rebindTextures = false
+                          console.log('rebinding reflection texture')
+                          if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
+                             !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
+                            var image = new Image()
+                            uniform.refTexture = ctx.createTexture()
+                            uniform.image = image
+                            cache.textures.push({
+                              url: uniform.map,
+                              resource: image,
+                              texture: uniform.refTexture
+                            })
+                            image.onload = async () => {
+                              ctx.activeTexture(ctx.TEXTURE1)
+                              BindImage(ctx, uniform.image,
+                              uniform.refTexture, uniform.textureMode, renderer.t, uniform)
+                            }
+                            fetch(uniform.map).then(res=>res.blob()).then(data => {
+                              image.src = URL.createObjectURL(data)
+                            })
+                            
+                          }else{
+                            console.log('resource found in cache. using it')
+                            cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
+                            uniform.image = cacheItem.resource
+                            uniform.refTexture = ctx.createTexture() //cacheItem.texture
+                            BindImage(ctx, uniform.image,
+                              uniform.refTexture, uniform.textureMode, renderer.t, uniform)
+                          }
+                        }
+                        if(uniform.textureMode == 'video'){
+                           BindImage(ctx, uniform.video,  uniform.refTexture, uniform.textureMode, renderer.t, uniform)
+                        }
                       }
-                    }
-                  break
+                      ctx.activeTexture(ctx.TEXTURE1)
+                      ctx.uniform1i(uniform.locRefTexture, 1)
+                      ctx.uniform1f(uniform.locRefTheta, uniform.theta)
+                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refTexture)
+                      
+                      ctx.uniform1f(uniform.locRefOmitEquirectangular,
+                           ( geometry.shapeType == 'rectangle' ||
+                             geometry.shapeType == 'point light' ||
+                             geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
+                    break
+                    case 'refraction':
+                      ctx.activeTexture(ctx.TEXTURE5)
+                      if(uniform.canvasTexture){
+                        if(typeof uniform.refractionTexture == 'undefined'){
+                          uniform.refractionTexture = ctx.createTexture()
+                        }
+                        ctx.bindTexture(ctx.TEXTURE_2D, uniform.refractionTexture)
+                        BindImage(ctx, uniform.canvasTexture,  uniform.refractionTexture, 'canvas', renderer.t, uniform)
+                      }else{
+                        if(uniform.textureMode == 'image' && uniform.rebindTextures){
+                          uniform.rebindTextures = false
+                          if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
+                             !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
+                            var image = new Image()
+                            uniform.refractionTexture = ctx.createTexture()
+                            uniform.image = image
+                            cache.textures.push({
+                              url: uniform.map,
+                              resource: image,
+                              texture: uniform.refractionTexture
+                            })
+                            image.onload = async () => {
+                              ctx.activeTexture(ctx.TEXTURE5)
+                              BindImage(ctx, uniform.image,
+                              uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
+                            }
+                            fetch(uniform.map).then(res=>res.blob()).then(data => {
+                              image.src = URL.createObjectURL(data)
+                            })
+                            
+                          }else{
+                            console.log('resource found in cache. using it')
+                            cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
+                            uniform.image = cacheItem.resource
+                            uniform.refractionTexture= ctx.createTexture() //cacheItem.texture
+                            BindImage(ctx, uniform.image,
+                              uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
+                          }
+                        }
+                        if(uniform.textureMode == 'video'){
+                           BindImage(ctx, uniform.video,  uniform.refractionTexture, uniform.textureMode, renderer.t, uniform)
+                        }
+                      }
+                      ctx.activeTexture(ctx.TEXTURE5)
+                      ctx.uniform1i(uniform.locRefractionTexture, 5)
+                      ctx.uniform1f(uniform.locRefractionTheta, uniform.theta)
+                      
+                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refractionTexture)
+                      
+                      ctx.uniform1f(uniform.locAngleOfRefraction,
+                           uniform.angleOfRefraction)
+                             
+                      ctx.uniform1f(uniform.locRefractionOmitEquirectangular,
+                           ( geometry.shapeType == 'rectangle' ||
+                             geometry.shapeType == 'point light' ||
+                             geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
+
+                    break
+                    case 'refraction2':
+                      ctx.activeTexture(ctx.TEXTURE6)
+                      if(uniform.canvasTexture){
+                        if(typeof uniform.refraction2Texture == 'undefined'){
+                          uniform.refraction2Texture = ctx.createTexture()
+                        }
+                        ctx.bindTexture(ctx.TEXTURE_2D, uniform.refraction2Texture)
+                        BindImage(ctx, uniform.canvasTexture,  uniform.refraction2Texture, 'canvas', renderer.t, uniform)
+                      }else{
+                        if(uniform.textureMode == 'image' && uniform.rebindTextures){
+                          uniform.rebindTextures = false
+                          if(cache.textures.filter(v=>v.url == uniform.map).length == 0 ||
+                             !cache.textures.filter(v=>v.url == uniform.map)[0].resource?.width){
+                            var image = new Image()
+                            uniform.refraction2Texture = ctx.createTexture()
+                            uniform.image = image
+                            cache.textures.push({
+                              url: uniform.map,
+                              resource: image,
+                              texture: uniform.refraction2Texture
+                            })
+                            image.onload = async () => {
+                              ctx.activeTexture(ctx.TEXTURE6)
+                              BindImage(ctx, uniform.image,
+                              uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
+                            }
+                            fetch(uniform.map).then(res=>res.blob()).then(data => {
+                              image.src = URL.createObjectURL(data)
+                            })
+                            
+                          }else{
+                            console.log('resource found in cache. using it')
+                            cacheItem = cache.textures.filter(v=>v.url == uniform.map)[0]
+                            uniform.image = cacheItem.resource
+                            uniform.refraction2Texture= ctx.createTexture() //cacheItem.texture
+                            BindImage(ctx, uniform.image,
+                              uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
+                          }
+                        }
+                        if(uniform.textureMode == 'video'){
+                           BindImage(ctx, uniform.video,  uniform.refraction2Texture, uniform.textureMode, renderer.t, uniform)
+                        }
+                      }
+                      ctx.activeTexture(ctx.TEXTURE6)
+                      
+                      uniform.locRefractionOmitEquirectangular = 
+                         ctx.getUniformLocation(dset.program, "refraction2OmitEquirectangular")
+                      ctx.uniform1f(uniform.locRefractionOmitEquirectangular,
+                                       uniform.omitEquirectangular ? 1 : 0)
+                      
+                      
+                      ctx.uniform1i(uniform.locRefraction2Texture, 6)
+                      ctx.uniform1f(uniform.locRefraction2Theta, uniform.theta)
+                      
+                      ctx.bindTexture(ctx.TEXTURE_2D, uniform.refraction2Texture)
+
+                      uniform.locRefractionExponent = ctx.getUniformLocation(dset.program, 'refractionExponent2')
+                      ctx.uniform1f(uniform.locRefractionExponent,
+                                       uniform.refractionExponent)
+                      
+                      ctx.uniform1f(uniform.locAngleOfRefraction2,
+                           uniform.angleOfRefraction)
+                             
+                      ctx.uniform1f(uniform.locRefraction2OmitEquirectangular,
+                           ( geometry.shapeType == 'rectangle' ||
+                             geometry.shapeType == 'point light' ||
+                             geometry.shapeType == 'sprite' ) ? 1.0 : 0.0)
+
+                      
+                    break
+                    case 'phong':
+                      uniform.locPhongTheta = ctx.getUniformLocation(dset.program, 'phongTheta')
+                      ctx.uniform1f(uniform.locPhongTheta, uniform.theta + Math.PI)
+                      //ctx.uniform1f(uniform.locPhongFlatShading, uniform.theta + Math.PI)
+                    break
+                    case 'custom':
+                      if(uniform.uniformName){
+                        var ar = uniform.value
+                        if(uniform.uniformName.indexOf('[0]') != -1){ // if uniform value is an array
+                        //if(IsArray(ar)){
+                          uniform.locCustomUniform =
+                             ctx.getUniformLocation(dset.program, uniform.uniformName)
+                          ctx[uniform.dataType](uniform.locCustomUniform, uniform.value)
+                        }else{
+                          uniform.locCustomUniform =
+                             ctx.getUniformLocation(dset.program, uniform.uniformName)
+                          ctx[uniform.dataType](uniform.locCustomUniform, ...uniform.value)
+                        }
+                      }
+                    break
+                  }
                 }
               }
             })
@@ -919,6 +926,17 @@ const Renderer = async options => {
             ctx.uniform1f(dset.locRenderNormals,   0)
 
 
+            // dynamically resize UVs, if needed
+            
+            if(geometry.oScaleUVX != geometry.scaleUVX ||
+               geometry.oScaleUVY != geometry.scaleUVY){
+              geometry.oScaleUVX = geometry.scaleUVX
+              geometry.oScaleUVY = geometry.scaleUVY
+              for(var i = 0; i < geometry.uvs.length; i+=2){
+                geometry.uvs[i+0] = geometry.oUvs[i+0] * geometry.scaleUVX
+                geometry.uvs[i+1] = geometry.oUvs[i+1] * geometry.scaleUVY
+              }
+            }
 
             // bind buffers
             ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.uv_buffer)
@@ -1636,6 +1654,12 @@ const DownloadCustomShape = geo => {
   var normalVecs            = []
   var flatShadingNormalVecs = []
   var uvs                   = []
+  var stride                = ''
+  var vstate                = []
+  var fsnvstate             = []
+  var nvstate               = []
+  var nstate                = []
+  var shapeData             = []
   for(var i = 0; i< geo.vertices.length; i++)
     vertices.push(Math.round(geo.vertices[i]*1e3)/1e3)
 
@@ -1677,12 +1701,54 @@ const DownloadCustomShape = geo => {
     for(var i = 0; i< geo.normalAssocs.length; i++)
       normalAssocs.push(geo.normalAssocs[i])
   }
-  
-  if(geo.preComputeNormalAssocs){
-    var object = { vertices, uvs, normals, normalVecs, normalAssocs, flatShadingNormalVecs}
+
+  if(geo.isShapeArray){
+    shapeData = geo.shapeData
+    if(geo?.stride){
+      stride = geo.stride
+    }
+    if(geo?.vstate){
+      geo.vstate.map(v => {
+        vstate.push(Math.round(v*1e3) / 1e3)
+      })
+    }
+    if(geo?.nstate){
+      geo.nstate.map(v => {
+        nstate.push(Math.round(v*1e3) / 1e3)
+      })
+    }
+    if(geo?.nvstate){
+      geo.nvstate.map(v => {
+        nvstate.push(Math.round(v*1e3) / 1e3)
+      })
+    }
+    if(geo?.fsnvstate){
+      geo.fsnvstate.map(v => {
+        fsnvstate.push(Math.round(v*1e3) / 1e3)
+      })
+    }
+    if(geo.preComputeNormalAssocs){
+      var object = {
+        vertices, uvs, normals, 
+        normalVecs, normalAssocs, flatShadingNormalVecs,
+        shapeData, vstate, nstate, nvstate, stride
+        }
+    }else{
+      var object = {
+        vertices, uvs, normals, normalVecs,
+        flatShadingNormalVecs, stride,
+        shapeData, vstate, nstate, nvstate
+      }
+    }
+    console.log('export object', object)
   }else{
-    var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs}
+    if(geo.preComputeNormalAssocs){
+      var object = { vertices, uvs, normals, normalVecs, normalAssocs, flatShadingNormalVecs}
+    }else{
+      var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs}
+    }
   }
+  
 
   var link      = document.createElement('a')
   link.href     = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(object))
@@ -1786,6 +1852,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var heightmapDataArrayFormat = gl.RGBA
   var lum                      = 1
   var alpha                    = 1
+  var oScaleUVX                = 1
+  var oScaleUVY                = 1
   var geometryData             = []  // for dynamic shape
   var texCoords                = []  // for dynamic shape
   
@@ -1950,11 +2018,18 @@ const LoadGeometry = async (renderer, geoOptions) => {
   //if(sphereize) averageNormals = true
 
   var uvs                   = []
+  var oUvs                  = []
   var normals               = []
   var vertices              = []
   var offsets               = []
   var normalVecs            = []
   var flatShadingNormalVecs = []
+  var shapeData             = []
+  var vstate                = []
+  var nstate                = []
+  var nvstate               = []
+  var fsnvstate             = []
+  var stride                = ''
 
   var fileURL, hint
   var resolvedFromCache = false
@@ -2035,10 +2110,31 @@ const LoadGeometry = async (renderer, geoOptions) => {
                 if(data?.flatShadingNormalVecs) {
                   flatShadingNormalVecs = data.flatShadingNormalVecs.map(v=>-v)
                 }
+                if(data?.stride) geometry.stride = data.stride
+                if(data?.fsnvstate) {
+                  fsnvstate = data.shapeData.map(v=>v)
+                }
+                if(data?.shapeData) {
+                  isShapeArray = true
+                  shapeData = data.shapeData.map(v=>v)
+                }
+                if(data?.vstate) {
+                  vstate = data.vstate.map(v=>v)
+                }
+                if(data?.nvstate) {
+                  nvstate = data.nvstate.map(v=>v)
+                }
+                //if(data?.uvstate) {
+                //  uvs = data.uvstate.map(v=>-v)
+                //}else{
+                  uvs         = data.uvs
+                //}
+                if(data?.nstate) {
+                  geometry.nstate = data.nstate.map(v=>-v)
+                }
                 vertices    = data.vertices
                 normals     = data.normals
                 normalVecs  = data.normalVecs.map(v=>-v)
-                uvs         = data.uvs
                 cache.geometry.push({data: structuredClone(data), url: fileURL})
               })
               resolved = true
@@ -2080,6 +2176,23 @@ const LoadGeometry = async (renderer, geoOptions) => {
             normals     = geometryData.normals
             normalVecs  = geometryData.normalVecs
             uvs         = geometryData.uvs
+
+
+            if(geometryData?.stride) stride = geometryData.stride
+            if(geometryData?.fsnvstate) {
+              fsnvstate= geometryData.shapeData.map(v=>v)
+            }
+            if(geometryData?.shapeData) {
+              isShapeArray = true
+              shapeData = geometryData.shapeData.map(v=>v)
+            }
+            if(geometryData?.vstate) {
+              vstate = geometryData.vstate.map(v=>v)
+            }
+            if(geometryData?.nvstate) {
+              nvstate = geometryData.nvstate.map(v=>v)
+            }
+
             resolved    = true
             //cache.customShapes.push({data: structuredClone(geometryData), url})
           }else{
@@ -2090,6 +2203,22 @@ const LoadGeometry = async (renderer, geoOptions) => {
               normals      = data.normals
               normalVecs   = data.normalVecs
               uvs          = data.uvs
+
+              if(data?.stride) stride = data.stride
+              if(data?.fsnvstate) {
+                fsnvstate= data.shapeData.map(v=>v)
+              }
+              if(data?.shapeData) {
+                isShapeArray = true
+                shapeData = data.shapeData.map(v=>v)
+              }
+              if(data?.vstate) {
+                vstate = data.vstate.map(v=>v)
+              }
+              if(data?.nvstate) {
+                nvstate = data.nvstate.map(v=>v)
+              }
+
               resolved     = true
               cache.customShapes.push({data: structuredClone(data), url})
             })
@@ -2345,6 +2474,10 @@ const LoadGeometry = async (renderer, geoOptions) => {
       uvs[i+1] += offsetUVY
     }
   }
+
+  oUvs = new Float32Array(uvs)
+  oScaleUVX = scaleUVX
+  oScaleUVY = scaleUVY
   
   if(scaleUVX != 1 || scaleUVY != 1) {
     for(var i = 0; i<uvs.length; i+=2){
@@ -2713,6 +2846,44 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }else{
       uvs.map(v => processedOutput.uvs.push(Math.round(v*1e3) / 1e3))
     }
+    if(geometry.isShapeArray){
+      processedOutput.shapeData = geometry.shapeData
+      if(geometry?.stride){
+        processedOutput.stride = geometry.stride
+      }
+      if(geometry?.vstate){
+        processedOutput.vstate = []
+        geometry.vstate.map(v => {
+          processedOutput.vstate.push(Math.round(v*1e3) / 1e3)
+        })
+      }
+      if(geometry?.nstate){
+        processedOutput.nstate = []
+        geometry.nstate.map(v => {
+          processedOutput.nstate.push(Math.round(v*1e3) / 1e3)
+        })
+      }
+      if(geometry?.nvstate){
+        processedOutput.nvstate = []
+        geometry.nvstate.map(v => {
+          processedOutput.nvstate.push(Math.round(v*1e3) / 1e3)
+        })
+      }
+      if(geometry?.fsnvstate){
+        processedOutput.fsnvstate = []
+        geometry.fsnvstate.map(v => {
+          processedOutput.fsnvstate.push(Math.round(v*1e3) / 1e3)
+        })
+      }
+      /*
+      if(geometry?.uvs){
+        processedOutput.uvs = []
+        geometry.uvs.map(v => {
+          processedOutput.uvs.push(Math.round(v*1e3) / 1e3)
+        })
+      }
+      */
+    }
     output.innerHTML = JSON.stringify(processedOutput)
     document.body.appendChild(popup)
   }
@@ -2914,8 +3085,10 @@ const LoadGeometry = async (renderer, geoOptions) => {
     rebindTextures, exportAsOBJ, downloadAsOBJ,
     resolved, isShapeArray, shapeArrayIsSprite,
     flatShadingNormalVecs, fsnVecIndices,
-    flatShadingNormalVec_buffer,
-    FlatShadingNormalVec_Index_Buffer,
+    flatShadingNormalVec_buffer, scaleUVX, scaleUVY,
+    FlatShadingNormalVec_Index_Buffer, fsnvstate,
+    nstate, vstate, nvstate, shapeData, stride,
+    oUvs, oScaleUVX, oScaleUVY
   }
   Object.keys(updateGeometry).forEach((key, idx) => {
     geometry[key] = updateGeometry[key]
@@ -2940,8 +3113,16 @@ const LoadGeometry = async (renderer, geoOptions) => {
   
   if(geometry.syncNormals) SyncNormals(geometry, averageNormals, flipNormals)
 
-  if(geometry.downloadShape && !isFromZip) DownloadCustomShape(geometry)
-  if(geometry.downloadAsOBJ && !isFromZip) DownloadAsOBJ(geometry)
+  if(geometry.downloadShape && !isFromZip) {
+    setTimeout(()=>{
+      DownloadCustomShape(geometry)
+    }, 0)
+  }
+  if(geometry.downloadAsOBJ && !isFromZip) {
+    setTimeout(()=>{
+      DownloadAsOBJ(geometry)
+    }, 0)
+  }
 
   return geometry
 }
@@ -3772,6 +3953,7 @@ const BasicShader = async (renderer, options=[]) => {
               if(typeof option[key]?.enabled == 'undefined' || !!option[key].enabled){
                 var uniformOption = {
                   name:                option[key].type,
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   playbackSpeed:       typeof option[key].playbackSpeed == 'undefined' ?
                                          1 : option[key].playbackSpeed,
                   uniformName:         typeof option[key].name == 'undefined' ?
@@ -3805,6 +3987,7 @@ const BasicShader = async (renderer, options=[]) => {
                  !!option[key].enabled){
                 var uniformOption = {
                   name:                option[key].type,
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   loc:                 '',
                   value:               typeof option[key].value == 'undefined' ?
                                          .5 : option[key].value,
@@ -3827,6 +4010,7 @@ const BasicShader = async (renderer, options=[]) => {
                 var uniformOption = {
                   name:                option[key].type,
                   playbackSpeed:       typeof option[key].playbackSpeed == 'undefined' ? 1 : option[key].playbackSpeed,
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   canvasTexture:  typeof option[key].canvasTexture == 'undefined' ? '' : option[key].canvasTexture,
                   involveCache:        typeof option[key].involveCache == 'undefined' ? true : option[key].involveCache,
                   muted:               typeof option[key].muted == 'undefined' ?   true : option[key].muted,
@@ -3947,6 +4131,7 @@ const BasicShader = async (renderer, options=[]) => {
                   playbackSpeed:       typeof option[key].playbackSpeed == 'undefined' ?
                                          1 : option[key].playbackSpeed,
                   involveCache:        typeof option[key].involveCache == 'undefined' ? true : option[key].involveCache,
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   canvasTexture:        typeof option[key].canvasTexture == 'undefined' ? '' : option[key].canvasTexture,
                   muted:               typeof option[key].muted == 'undefined' ?
                                          true : option[key].muted,
@@ -4070,6 +4255,7 @@ const BasicShader = async (renderer, options=[]) => {
                  !!option[key].enabled){
                 var uniformOption = {
                   name:                option[key].type,
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   playbackSpeed:       typeof option[key].playbackSpeed == 'undefined' ?  1 : option[key].playbackSpeed,
                   involveCache:        typeof option[key].involveCache == 'undefined' ? true : option[key].involveCache,
                   canvasTexture:  typeof option[key].canvasTexture == 'undefined' ? '' : option[key].canvasTexture,
@@ -4201,6 +4387,7 @@ const BasicShader = async (renderer, options=[]) => {
                 var uniformOption = {
                   name:                option[key].type,
                   loc:                 '',
+                  enabled:             typeof option[key].enabled== 'undefined' ?  true : !!option[key].enabled,
                   value:               typeof option[key].value == 'undefined' ?
                                          .3 : option[key].value,
                   flatShading:         typeof option[key].flatShading == 'undefined' ?
@@ -4747,6 +4934,7 @@ const BasicShader = async (renderer, options=[]) => {
       uniform vec3 camOri;
       uniform vec3 geoPos;
       uniform vec3 geoOri;
+      float cMix:
       vec4 mixColor;
       vec4 addInColor;
       
@@ -4948,6 +5136,7 @@ const BasicShader = async (renderer, options=[]) => {
               }
 
               vec2 coords = Coords(0.0, nVi);
+              cMix = colorMix;
               
               ${uFragCode}
               ${aFragCode}
@@ -4968,9 +5157,9 @@ const BasicShader = async (renderer, options=[]) => {
                 
                 texel.a /= 2.0;
                 vec4 col = merge(addInColor, texel);
-                float ip = max(0.0, 1.0 - colorMix);
+                float ip = max(0.0, 1.0 - cMix);
                 col = merge(vec4(col.rgb, ip),
-                        vec4(color.rgb, colorMix));
+                        vec4(color.rgb, cMix));
 
                 col.a = 1.0;
                 col.rgb *= light.rgb;
@@ -5727,8 +5916,12 @@ const BasicShader = async (renderer, options=[]) => {
 }
 
 const ApplyShapeData = shape => {
+  
+  
   if(!shape?.shapeData || !shape?.shapeData.length) return
-  var l1, l2
+  var l1, l2, x, y, z, p, d
+  
+  ProcessShapeArray(shape)
   shape.shapeData.map((subShape, sidx) => {
     subShape.moffsetx = 0
     subShape.moffsety = 0
@@ -6017,7 +6210,7 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     })
     delete options.shapeData
   }
-  var tcan, tshptyp = shape.shapeType, ret, opts = { shapeData }
+  var tcan, tshptyp = shape.shapeType, ret, opts = { }
   if(shape.canvasTexture) tcan = shape.canvasTexture
   ;([
     'x', 'y', 'z', 'rows', 'cols', 'size', 'url',
@@ -6075,6 +6268,7 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     geometry.isShapeArray = true
     if(opts.shapeArrayIsSprite) geometry.shapeArrayIsSprite = true
     ret = geometry
+    ret.shapeData = shapeData
   })
   return ret
 }

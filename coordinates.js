@@ -1,6 +1,6 @@
 // 'Coordinates', a webgl framework
 // Scott McGann - whitehotrobot@gmail.com
-// all rights reserved - ©2026
+// all rights reserved - ©2025
 
 const ModuleBase = 'https://srmcgann.github.io/Coordinates'
 
@@ -919,17 +919,6 @@ const Renderer = async options => {
             ctx.uniform1f(dset.locRenderNormals,   0)
 
 
-            // dynamically resize UVs, if needed
-            
-            if(geometry.oScaleUVX != geometry.scaleUVX ||
-               geometry.oScaleUVY != geometry.scaleUVY){
-              geometry.oScaleUVX = geometry.scaleUVX
-              geometry.oScaleUVY = geometry.scaleUVY
-              for(var i = 0; i < geometry.uvs.length; i+=2){
-                geometry.uvs[i+0] = geometry.oUvs[i+0] * geometry.scaleUVX
-                geometry.uvs[i+1] = geometry.oUvs[i+1] * geometry.scaleUVY
-              }
-            }
 
             // bind buffers
             ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.uv_buffer)
@@ -1647,12 +1636,6 @@ const DownloadCustomShape = geo => {
   var normalVecs            = []
   var flatShadingNormalVecs = []
   var uvs                   = []
-  var stride                = ''
-  var vstate                = []
-  var fsnvstate             = []
-  var nvstate               = []
-  var nstate                = []
-  var shapeData             = []
   for(var i = 0; i< geo.vertices.length; i++)
     vertices.push(Math.round(geo.vertices[i]*1e3)/1e3)
 
@@ -1694,54 +1677,12 @@ const DownloadCustomShape = geo => {
     for(var i = 0; i< geo.normalAssocs.length; i++)
       normalAssocs.push(geo.normalAssocs[i])
   }
-
-  if(geo.isShapeArray){
-    shapeData = geo.shapeData
-    if(geo?.stride){
-      stride = geo.stride
-    }
-    if(geo?.vstate){
-      geo.vstate.map(v => {
-        vstate.push(Math.round(v*1e3) / 1e3)
-      })
-    }
-    if(geo?.nstate){
-      geo.nstate.map(v => {
-        nstate.push(Math.round(v*1e3) / 1e3)
-      })
-    }
-    if(geo?.nvstate){
-      geo.nvstate.map(v => {
-        nvstate.push(Math.round(v*1e3) / 1e3)
-      })
-    }
-    if(geo?.fsnvstate){
-      geo.fsnvstate.map(v => {
-        fsnvstate.push(Math.round(v*1e3) / 1e3)
-      })
-    }
-    if(geo.preComputeNormalAssocs){
-      var object = {
-        vertices, uvs, normals, 
-        normalVecs, normalAssocs, flatShadingNormalVecs,
-        shapeData, vstate, nstate, nvstate, stride
-        }
-    }else{
-      var object = {
-        vertices, uvs, normals, normalVecs,
-        flatShadingNormalVecs, stride,
-        shapeData, vstate, nstate, nvstate
-      }
-    }
-    console.log('export object', object)
-  }else{
-    if(geo.preComputeNormalAssocs){
-      var object = { vertices, uvs, normals, normalVecs, normalAssocs, flatShadingNormalVecs}
-    }else{
-      var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs}
-    }
-  }
   
+  if(geo.preComputeNormalAssocs){
+    var object = { vertices, uvs, normals, normalVecs, normalAssocs, flatShadingNormalVecs}
+  }else{
+    var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs}
+  }
 
   var link      = document.createElement('a')
   link.href     = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(object))
@@ -1845,8 +1786,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var heightmapDataArrayFormat = gl.RGBA
   var lum                      = 1
   var alpha                    = 1
-  var oScaleUVX                = 1
-  var oScaleUVY                = 1
   var geometryData             = []  // for dynamic shape
   var texCoords                = []  // for dynamic shape
   
@@ -2011,18 +1950,11 @@ const LoadGeometry = async (renderer, geoOptions) => {
   //if(sphereize) averageNormals = true
 
   var uvs                   = []
-  var oUvs                  = []
   var normals               = []
   var vertices              = []
   var offsets               = []
   var normalVecs            = []
   var flatShadingNormalVecs = []
-  var shapeData             = []
-  var vstate                = []
-  var nstate                = []
-  var nvstate               = []
-  var fsnvstate             = []
-  var stride                = ''
 
   var fileURL, hint
   var resolvedFromCache = false
@@ -2103,31 +2035,10 @@ const LoadGeometry = async (renderer, geoOptions) => {
                 if(data?.flatShadingNormalVecs) {
                   flatShadingNormalVecs = data.flatShadingNormalVecs.map(v=>-v)
                 }
-                if(data?.stride) geometry.stride = data.stride
-                if(data?.fsnvstate) {
-                  fsnvstate = data.shapeData.map(v=>v)
-                }
-                if(data?.shapeData) {
-                  isShapeArray = true
-                  shapeData = data.shapeData.map(v=>v)
-                }
-                if(data?.vstate) {
-                  vstate = data.vstate.map(v=>v)
-                }
-                if(data?.nvstate) {
-                  nvstate = data.nvstate.map(v=>v)
-                }
-                //if(data?.uvstate) {
-                //  uvs = data.uvstate.map(v=>-v)
-                //}else{
-                  uvs         = data.uvs
-                //}
-                if(data?.nstate) {
-                  geometry.nstate = data.nstate.map(v=>-v)
-                }
                 vertices    = data.vertices
                 normals     = data.normals
                 normalVecs  = data.normalVecs.map(v=>-v)
+                uvs         = data.uvs
                 cache.geometry.push({data: structuredClone(data), url: fileURL})
               })
               resolved = true
@@ -2169,23 +2080,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
             normals     = geometryData.normals
             normalVecs  = geometryData.normalVecs
             uvs         = geometryData.uvs
-
-
-            if(geometryData?.stride) stride = geometryData.stride
-            if(geometryData?.fsnvstate) {
-              fsnvstate= geometryData.shapeData.map(v=>v)
-            }
-            if(geometryData?.shapeData) {
-              isShapeArray = true
-              shapeData = geometryData.shapeData.map(v=>v)
-            }
-            if(geometryData?.vstate) {
-              vstate = geometryData.vstate.map(v=>v)
-            }
-            if(geometryData?.nvstate) {
-              nvstate = geometryData.nvstate.map(v=>v)
-            }
-
             resolved    = true
             //cache.customShapes.push({data: structuredClone(geometryData), url})
           }else{
@@ -2196,22 +2090,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
               normals      = data.normals
               normalVecs   = data.normalVecs
               uvs          = data.uvs
-
-              if(data?.stride) stride = data.stride
-              if(data?.fsnvstate) {
-                fsnvstate= data.shapeData.map(v=>v)
-              }
-              if(data?.shapeData) {
-                isShapeArray = true
-                shapeData = data.shapeData.map(v=>v)
-              }
-              if(data?.vstate) {
-                vstate = data.vstate.map(v=>v)
-              }
-              if(data?.nvstate) {
-                nvstate = data.nvstate.map(v=>v)
-              }
-
               resolved     = true
               cache.customShapes.push({data: structuredClone(data), url})
             })
@@ -2467,10 +2345,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
       uvs[i+1] += offsetUVY
     }
   }
-
-  oUvs = new Float32Array(uvs)
-  oScaleUVX = scaleUVX
-  oScaleUVY = scaleUVY
   
   if(scaleUVX != 1 || scaleUVY != 1) {
     for(var i = 0; i<uvs.length; i+=2){
@@ -2839,44 +2713,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }else{
       uvs.map(v => processedOutput.uvs.push(Math.round(v*1e3) / 1e3))
     }
-    if(geometry.isShapeArray){
-      processedOutput.shapeData = geometry.shapeData
-      if(geometry?.stride){
-        processedOutput.stride = geometry.stride
-      }
-      if(geometry?.vstate){
-        processedOutput.vstate = []
-        geometry.vstate.map(v => {
-          processedOutput.vstate.push(Math.round(v*1e3) / 1e3)
-        })
-      }
-      if(geometry?.nstate){
-        processedOutput.nstate = []
-        geometry.nstate.map(v => {
-          processedOutput.nstate.push(Math.round(v*1e3) / 1e3)
-        })
-      }
-      if(geometry?.nvstate){
-        processedOutput.nvstate = []
-        geometry.nvstate.map(v => {
-          processedOutput.nvstate.push(Math.round(v*1e3) / 1e3)
-        })
-      }
-      if(geometry?.fsnvstate){
-        processedOutput.fsnvstate = []
-        geometry.fsnvstate.map(v => {
-          processedOutput.fsnvstate.push(Math.round(v*1e3) / 1e3)
-        })
-      }
-      /*
-      if(geometry?.uvs){
-        processedOutput.uvs = []
-        geometry.uvs.map(v => {
-          processedOutput.uvs.push(Math.round(v*1e3) / 1e3)
-        })
-      }
-      */
-    }
     output.innerHTML = JSON.stringify(processedOutput)
     document.body.appendChild(popup)
   }
@@ -3078,10 +2914,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
     rebindTextures, exportAsOBJ, downloadAsOBJ,
     resolved, isShapeArray, shapeArrayIsSprite,
     flatShadingNormalVecs, fsnVecIndices,
-    flatShadingNormalVec_buffer, scaleUVX, scaleUVY,
-    FlatShadingNormalVec_Index_Buffer, fsnvstate,
-    nstate, vstate, nvstate, shapeData, stride,
-    oUvs, oScaleUVX, oScaleUVY
+    flatShadingNormalVec_buffer,
+    FlatShadingNormalVec_Index_Buffer,
   }
   Object.keys(updateGeometry).forEach((key, idx) => {
     geometry[key] = updateGeometry[key]
@@ -3106,16 +2940,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
   
   if(geometry.syncNormals) SyncNormals(geometry, averageNormals, flipNormals)
 
-  if(geometry.downloadShape && !isFromZip) {
-    setTimeout(()=>{
-      DownloadCustomShape(geometry)
-    }, 0)
-  }
-  if(geometry.downloadAsOBJ && !isFromZip) {
-    setTimeout(()=>{
-      DownloadAsOBJ(geometry)
-    }, 0)
-  }
+  if(geometry.downloadShape && !isFromZip) DownloadCustomShape(geometry)
+  if(geometry.downloadAsOBJ && !isFromZip) DownloadAsOBJ(geometry)
 
   return geometry
 }
@@ -5901,12 +5727,8 @@ const BasicShader = async (renderer, options=[]) => {
 }
 
 const ApplyShapeData = shape => {
-  
-  
   if(!shape?.shapeData || !shape?.shapeData.length) return
-  var l1, l2, x, y, z, p, d
-  
-  ProcessShapeArray(shape)
+  var l1, l2
   shape.shapeData.map((subShape, sidx) => {
     subShape.moffsetx = 0
     subShape.moffsety = 0
@@ -6195,7 +6017,7 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     })
     delete options.shapeData
   }
-  var tcan, tshptyp = shape.shapeType, ret, opts = { }
+  var tcan, tshptyp = shape.shapeType, ret, opts = { shapeData }
   if(shape.canvasTexture) tcan = shape.canvasTexture
   ;([
     'x', 'y', 'z', 'rows', 'cols', 'size', 'url',
@@ -6253,7 +6075,6 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     geometry.isShapeArray = true
     if(opts.shapeArrayIsSprite) geometry.shapeArrayIsSprite = true
     ret = geometry
-    ret.shapeData = shapeData
   })
   return ret
 }

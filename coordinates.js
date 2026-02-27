@@ -5155,7 +5155,7 @@ const BasicShader = async (renderer, options=[]) => {
                 
                 texel.a /= 2.0;
                 vec4 col = merge(addInColor, texel);
-                vec4 col = merge(col, mixColor);
+                col = merge(col, mixColor);
                 float ip = max(0.0, 1.0 - colorMix);
                 col = merge(vec4(col.rgb, ip),
                         vec4(color.rgb, colorMix));

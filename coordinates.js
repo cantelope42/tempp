@@ -1215,10 +1215,10 @@ const ProcessOBJData = (data, vInd, nInd, uInd, fInd, ret) => {
                         ...n[2], ...n[3], ...n[0])
       break
     }
-    //var l = ret.normals.length - 7
-    //var nvx = ret.normals[l+3] - ret.normals[l+0]
-    //var nvy = ret.normals[l+4] - ret.normals[l+1]
-    //var nvz = ret.normals[l+5] - ret.normals[l+2]
+    var l = ret.normals.length - 7
+    var nvx = ret.normals[l+3] - ret.normals[l+0]
+    var nvy = ret.normals[l+4] - ret.normals[l+1]
+    var nvz = ret.normals[l+5] - ret.normals[l+2]
   })
 }
 
@@ -1227,7 +1227,9 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
   for(var i = 0; i<ret.uvs.length; i+=2){
     ret.uvs[i+1] = 1-ret.uvs[i+1]
   }
-  var normals = Array(ret.vertices.length*2).fill(0)
+  for(var i = 0; i<ret.normals.length; i+=3){
+    ret.normals[i+1] = ret.normals[i+1]
+  }
   for(var i = 0; i<ret.vertices.length; i+=3){
     X = ret.vertices[i+0]
     Y = ret.vertices[i+1]
@@ -1238,21 +1240,18 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     ret.vertices[i+1] = ar[1]
     ret.vertices[i+2] = ar[2]
 
-    X = ret.normals[i+0]
-    Y = ret.normals[i+1]
-    Z = ret.normals[i+2]
-    var ar = [X,Y,Z]
-    ar = R_pyr(...ar, {roll:rl, pitch:pt, yaw:yw})
-    normals[i*2+0] = ret.vertices[i+0]
-    normals[i*2+1] = ret.vertices[i+1]
-    normals[i*2+2] = ret.vertices[i+2]
-    normals[i*2+3] = ret.vertices[i+0] + ar[0]
-    normals[i*2+4] = ret.vertices[i+1] + ar[1]
-    normals[i*2+5] = ret.vertices[i+2] + ar[2]
+    for(var m = 2; m--;){
+      var l = m ? i*2 : i*2+3
+      X = ret.normals[l+0]
+      Y = ret.normals[l+1]
+      Z = ret.normals[l+2]
+      var ar = [X,Y,Z]
+      ar = R_pyr(...ar, {roll:rl, pitch:pt, yaw:yw})
+      ret.normals[l+0] = ar[0]
+      ret.normals[l+1] = ar[1]
+      ret.normals[l+2] = ar[2]
+    }
   }
-  // normals from obj format -> line segs (for optional display), to be converted
-  // and populated as normalVecs in LoadGeometry, for rendering
-  ret.normals = normals
 }
 
 const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, involveCache=true) => {
@@ -1411,15 +1410,18 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
                   var flatShadingNormalVecs = []
                   var uvs                   = []
                   for(var i = 0; i < geo.vertices.length; i++)
-                    vertices.push(Math.round(geo.vertices[i]*1e4)/1e4)
+                    vertices.push(Math.round(geo.vertices[i]*1e3)/1e3)
                   for(var i = 0; i < geo.uvs.length; i++)
-                    uvs.push(Math.round(geo.uvs[i]*1e4)/1e4)
-                  for(var i = 0; i < geo.normals.length; i++)
-                    normals.push(Math.round(geo.normals[i]*1e4)/1e4)
+                    uvs.push(Math.round(geo.uvs[i]*1e3)/1e3)
+                  for(var i = 0; i < geo.normals.length; i+=3){
+                    normals.push(Math.round(geo.normals[i+0]*1e3)/1e3)
+                    normals.push(Math.round(geo.normals[i+1]*1e3)/1e3)
+                    normals.push(Math.round(geo.normals[i+2]*1e3)/1e3)
+                  }
                   for(var i = 0; i < geo.normalVecs.length; i++)
-                    normalVecs.push(Math.round(geo.normalVecs[i]*1e4)/1e4)
+                    normalVecs.push(Math.round(geo.normalVecs[i]*1e3)/1e3)
                   for(var i = 0; i < geo.flatShadingNormalVecs.length; i++)
-                    flatShadingNormalVecs.push(Math.round(geo.flatShadingNormalVecs[i]*1e4)/1e4)
+                    flatShadingNormalVecs.push(Math.round(geo.flatShadingNormalVecs[i]*1e3)/1e3)
                   var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs }
                   var textReader = new zip.TextReader(JSON.stringify(object))
                   var ct = (''+(idx+1)).padStart(4, '0')
@@ -1907,7 +1909,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
       case 'objroll'            : objRoll = geoOptions[key]; break
       case 'objpitch'           : objPitch = geoOptions[key]; break
       case 'objyaw'             : objYaw = geoOptions[key]; break
-      case 'isfromzip'          : isFromZip = !!geoOptions[key]; break
       case 'scaleuvx'           : scaleUVX = geoOptions[key]; break
       case 'scaleuvy'           : scaleUVY = geoOptions[key]; break
       case 'offsetuvx'          : offsetUVX = geoOptions[key]; break
@@ -2411,13 +2412,14 @@ const LoadGeometry = async (renderer, geoOptions) => {
           OBJFinishing(ret)
           vertices    = ret.vertices
           normals     = ret.normals
+          //normalVecs  = ret.normalVecs
           uvs         = ret.uvs
           resolved    = true
         }else{
           shape = await LoadOBJ(url, size, 0,0,0,0,0,0, false, true)
-          vertices   = shape.vertices
-          normals    = shape.normals
-          uvs        = shape.uvs
+          vertices = shape.vertices
+          normals  = shape.normals
+          uvs      = shape.uvs
         }
       break
       case 'dodecahedron':
@@ -2632,7 +2634,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     //ComputeNormalAssocs(ret)
   }
 
-  if((!resolved || shapeType == 'obj') && (1 || shapeType != 'custom shape') &&
+  if(!resolved && (1 || shapeType != 'custom shape') &&
     !isParticle && !isLine && !averageNormals &&
      (!resolvedFromCache || !resolved)){
     normalVecs            = []
@@ -2646,7 +2648,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }
   }
 
-  if((shapeType == 'custom shape' || (0 && shapeType == 'obj')) && 
+  if((shapeType == 'custom shape' || shapeType == 'obj') && 
     (objPitch || objRoll || objYaw || objX || objY || objZ)){
     for(var i = 0; i < vertices.length; i+=3){
       var x = vertices[i+0]

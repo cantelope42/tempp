@@ -1227,9 +1227,7 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
   for(var i = 0; i<ret.uvs.length; i+=2){
     ret.uvs[i+1] = 1-ret.uvs[i+1]
   }
-  //for(var i = 0; i<ret.normals.length; i+=3){
-  //  ret.normals[i+1] = ret.normals[i+1]
-  //}
+  var normals = []
   for(var i = 0; i<ret.vertices.length; i+=3){
     X = ret.vertices[i+0]
     Y = ret.vertices[i+1]
@@ -1248,13 +1246,14 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     ret.normalVecs[i+0] = ar[0]
     ret.normalVecs[i+1] = ar[1]
     ret.normalVecs[i+2] = ar[2]
-    ret.normals[i*2+0] = ret.vertices[i+0]
-    ret.normals[i*2+1] = ret.vertices[i+1]
-    ret.normals[i*2+2] = ret.vertices[i+2]
-    ret.normals[i*2+3] = ret.vertices[i+3] + ar[0]
-    ret.normals[i*2+4] = ret.vertices[i+4] + ar[1]
-    ret.normals[i*2+5] = ret.vertices[i+5] + ar[2]
+    normals[i*2+0] = ret.vertices[i+0]
+    normals[i*2+1] = ret.vertices[i+1]
+    normals[i*2+2] = ret.vertices[i+2]
+    normals[i*2+3] = ret.vertices[i+3] + ar[0]
+    normals[i*2+4] = ret.vertices[i+4] + ar[1]
+    normals[i*2+5] = ret.vertices[i+5] + ar[2]
   }
+  ret.normals = new normals
 }
 
 const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, involveCache=true) => {

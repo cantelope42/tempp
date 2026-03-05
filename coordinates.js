@@ -2413,7 +2413,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
       break
       case 'obj':
         if(geometryData.length){
-          var ret = { vertices: [], normals: [], uvs: [] }
+          var ret = { vertices: [], normals: [], normalVecs: [], uvs: [] }
           var vInd = []
           var nInd = []
           var uInd = []
@@ -2422,7 +2422,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
           OBJFinishing(ret)
           vertices    = ret.vertices
           normals     = ret.normals
-          //normalVecs  = ret.normalVecs
+          normalVecs  = ret.normalVecs
           uvs         = ret.uvs
           resolved    = true
         }else{

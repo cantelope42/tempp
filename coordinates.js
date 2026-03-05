@@ -1219,6 +1219,7 @@ const ProcessOBJData = (data, vInd, nInd, uInd, fInd, ret) => {
     var nvx = ret.normals[l+3] - ret.normals[l+0]
     var nvy = ret.normals[l+4] - ret.normals[l+1]
     var nvz = ret.normals[l+5] - ret.normals[l+2]
+    ret.normalVecs.push(nvx, nvy, nvz)
   })
 }
 
@@ -1239,6 +1240,15 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     ret.vertices[i+0] = ar[0]
     ret.vertices[i+1] = ar[1]
     ret.vertices[i+2] = ar[2]
+    
+    X = ret.normalVecs[i+0]
+    Y = ret.normalVecs[i+1]
+    Z = ret.normalVecs[i+2]
+    var ar = [X,Y,Z]
+    ar = R_pyr(...ar, {roll:rl, pitch:pt, yaw:yw})
+    ret.normalVecs[i+0] = ar[0]
+    ret.normalVecs[i+1] = ar[1]
+    ret.normalVecs[i+2] = ar[2]
 
     for(var m = 2; m--;){
       var l = m ? i*2 : i*2+3
@@ -1255,7 +1265,7 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
 }
 
 const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, involveCache=true) => {
-  var ret = { vertices: [], normals: [], uvs: []}
+  var ret = { vertices: [], normals: [], normalVecs: [], uvs: []}
   
   var a, X, Y, Z
   if(involveCache && (cacheItem = cache.objFiles.filter(v=>v.url == url)).length){

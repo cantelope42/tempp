@@ -2632,7 +2632,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     //ComputeNormalAssocs(ret)
   }
 
-  if(!resolved && (1 || shapeType != 'custom shape') &&
+  if((!resolved || shapeType == 'obj') && (1 || shapeType != 'custom shape') &&
     !isParticle && !isLine && !averageNormals &&
      (!resolvedFromCache || !resolved)){
     normalVecs            = []
@@ -2646,7 +2646,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }
   }
 
-  if((shapeType == 'custom shape' || shapeType == 'obj') && 
+  if((shapeType == 'custom shape' || (0 && shapeType == 'obj')) && 
     (objPitch || objRoll || objYaw || objX || objY || objZ)){
     for(var i = 0; i < vertices.length; i+=3){
       var x = vertices[i+0]

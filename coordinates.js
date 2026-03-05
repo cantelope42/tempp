@@ -1403,6 +1403,7 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
                 options.name = `${baseName?baseName+'_':''}frame${ct}.json`
                 options.isFromZip = true
                 LoadGeometry(renderer, options).then(async (geo) => {
+                  console.log('frame loaded... [geo] ', geo)
                   ret.geometries[idx/1|0] = geo
                   await shader.ConnectGeometry(geo)
                   var vertices              = []

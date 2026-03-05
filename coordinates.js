@@ -1254,7 +1254,7 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     normals[i*2+4] = ret.vertices[i+4] + ar[1]
     normals[i*2+5] = ret.vertices[i+5] + ar[2]
   }
-  ret.normals = new normals
+  ret.normals = normals
 }
 
 const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, involveCache=true) => {

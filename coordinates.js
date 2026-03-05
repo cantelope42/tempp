@@ -1395,7 +1395,7 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
             frames.forEach((frame, idx) => {
               var ct = (''+(idx+1)).padStart(4, '0')
               if(!(idx%1) && ((options.shapeType != 'lines' && 
-                               (options.shapeType != 'custom shape') || options.shapeType != 'obj')) ||
+                               options.shapeType != 'custom shape' && options.shapeType != 'obj') ||
                               typeof frame.data.vertices != 'undefined'
                               && frame.data.vertices.length)){
                 options.geometryData = frame.data

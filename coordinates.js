@@ -1936,6 +1936,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
       case 'downloadasobj'      : downloadAsOBJ = !!geoOptions[key]; break
       case 'penumbra'           : penumbra = geoOptions[key]; break
       case 'url'                : url = geoOptions[key]; break
+      case 'isfromzip'          : isFromZip = !!geoOptions[key]; break
       case 'map'                : map = geoOptions[key]; break
       case 'glow'               : glow = !!geoOptions[key]; break
       case 'glowcolor'          : glowColor = geoOptions[key]; break

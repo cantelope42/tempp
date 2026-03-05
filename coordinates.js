@@ -1403,7 +1403,14 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
                 options.name = `${baseName?baseName+'_':''}frame${ct}.json`
                 options.isFromZip = true
                 LoadGeometry(renderer, options).then(async (geo) => {
-                  console.log('frame loaded... [geo] ', geo)
+                  geo.normalVecs = []
+                  for(var i = 0; i < geo.normals.length; i+=6){
+                    var nx = geo.normals[i+3] - geo.normals[i+0]
+                    var ny = geo.normals[i+4] - geo.normals[i+1]
+                    var nz = geo.normals[i+5] - geo.normals[i+2]
+                    geo.normalVecs.push(nx, ny, nz)
+                  }
+                  geo.normalVecs = new Float32Array(geo.normalVecs)
                   ret.geometries[idx/1|0] = geo
                   await shader.ConnectGeometry(geo)
                   var vertices              = []

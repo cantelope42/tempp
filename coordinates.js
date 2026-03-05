@@ -1386,7 +1386,7 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
         (await file.getData(await (new zip.BlobWriter()))).text().then(data=>{
           var ct = 0
           do{ ct++ }while(data.substr(0,2)=='PK');
-          if((options.shapeType == 'custom shape' || options.shapeType == 'obj') ||
+          if(options.shapeType == 'custom shape' ||
              options.shapeType == 'lines') data = JSON.parse(data)
           frames[i].data = data
           if(i==tct-1) {
@@ -1395,11 +1395,11 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
             frames.forEach((frame, idx) => {
               var ct = (''+(idx+1)).padStart(4, '0')
               if(!(idx%1) && ((options.shapeType != 'lines' && 
-                               options.shapeType != 'custom shape' && options.shapeType != 'obj') ||
+                               options.shapeType != 'custom shape') ||
                               typeof frame.data.vertices != 'undefined'
                               && frame.data.vertices.length)){
                 options.geometryData = frame.data
-                options.name = `${baseName?baseName+'_':''}frame${ct}.${options.shapeType=='obj'?'obj':'json'}`
+                options.name = `${baseName?baseName+'_':''}frame${ct}.json`
                 options.isFromZip = true
                 LoadGeometry(renderer, options).then(async (geo) => {
                   ret.geometries[idx/1|0] = geo
@@ -1410,18 +1410,15 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
                   var flatShadingNormalVecs = []
                   var uvs                   = []
                   for(var i = 0; i < geo.vertices.length; i++)
-                    vertices.push(Math.round(geo.vertices[i]*1e3)/1e3)
+                    vertices.push(Math.round(geo.vertices[i]*1e4)/1e4)
                   for(var i = 0; i < geo.uvs.length; i++)
-                    uvs.push(Math.round(geo.uvs[i]*1e3)/1e3)
-                  for(var i = 0; i < geo.normals.length; i+=3){
-                    normals.push(Math.round(geo.normals[i+0]*1e3)/1e3)
-                    normals.push(Math.round(geo.normals[i+1]*1e3)/1e3)
-                    normals.push(Math.round(geo.normals[i+2]*1e3)/1e3)
-                  }
+                    uvs.push(Math.round(geo.uvs[i]*1e4)/1e4)
+                  for(var i = 0; i < geo.normals.length; i++)
+                    normals.push(Math.round(geo.normals[i]*1e4)/1e4)
                   for(var i = 0; i < geo.normalVecs.length; i++)
-                    normalVecs.push(Math.round(geo.normalVecs[i]*1e3)/1e3)
+                    normalVecs.push(Math.round(geo.normalVecs[i]*1e4)/1e4)
                   for(var i = 0; i < geo.flatShadingNormalVecs.length; i++)
-                    flatShadingNormalVecs.push(Math.round(geo.flatShadingNormalVecs[i]*1e3)/1e3)
+                    flatShadingNormalVecs.push(Math.round(geo.flatShadingNormalVecs[i]*1e4)/1e4)
                   var object = { vertices, uvs, normals, normalVecs, flatShadingNormalVecs }
                   var textReader = new zip.TextReader(JSON.stringify(object))
                   var ct = (''+(idx+1)).padStart(4, '0')
@@ -1909,6 +1906,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
       case 'objroll'            : objRoll = geoOptions[key]; break
       case 'objpitch'           : objPitch = geoOptions[key]; break
       case 'objyaw'             : objYaw = geoOptions[key]; break
+      case 'isfromzip'          : isFromZip = !!geoOptions[key]; break
       case 'scaleuvx'           : scaleUVX = geoOptions[key]; break
       case 'scaleuvy'           : scaleUVY = geoOptions[key]; break
       case 'offsetuvx'          : offsetUVX = geoOptions[key]; break

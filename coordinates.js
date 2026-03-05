@@ -1228,6 +1228,7 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     ret.uvs[i+1] = 1-ret.uvs[i+1]
   }
   var normals = []
+  ret.normalVecs = Array(ret.vertices.length).fill(0)
   for(var i = 0; i<ret.vertices.length; i+=3){
     X = ret.vertices[i+0]
     Y = ret.vertices[i+1]

@@ -1386,7 +1386,7 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
         (await file.getData(await (new zip.BlobWriter()))).text().then(data=>{
           var ct = 0
           do{ ct++ }while(data.substr(0,2)=='PK');
-          if(options.shapeType == 'custom shape' ||
+          if((options.shapeType == 'custom shape' || options.shapeType == 'obj') ||
              options.shapeType == 'lines') data = JSON.parse(data)
           frames[i].data = data
           if(i==tct-1) {
@@ -1395,11 +1395,11 @@ const LoadAnimationFromZip = (renderer, options, shader) => {
             frames.forEach((frame, idx) => {
               var ct = (''+(idx+1)).padStart(4, '0')
               if(!(idx%1) && ((options.shapeType != 'lines' && 
-                               options.shapeType != 'custom shape') ||
+                               (options.shapeType != 'custom shape') || options.shapeType != 'obj')) ||
                               typeof frame.data.vertices != 'undefined'
                               && frame.data.vertices.length)){
                 options.geometryData = frame.data
-                options.name = `${baseName?baseName+'_':''}frame${ct}.json`
+                options.name = `${baseName?baseName+'_':''}frame${ct}.${options.shapeType=='obj'?'obj':'json'}`
                 options.isFromZip = true
                 LoadGeometry(renderer, options).then(async (geo) => {
                   ret.geometries[idx/1|0] = geo
@@ -4957,6 +4957,7 @@ const BasicShader = async (renderer, options=[]) => {
       float rheightMapIntensity;
       float rmaxHeightmap;
       float cMix;
+      float sMix;
 
       ${uFragDeclaration}
       ${aFragDeclaration}
@@ -5137,12 +5138,13 @@ const BasicShader = async (renderer, options=[]) => {
 
               vec2 coords = Coords(0.0, nVi);
               cMix = colorMix;
+              sMix = supplementalTextureMix;
               
               ${uFragCode}
               ${aFragCode}
               
               vec4 texel = texture2D( baseTexture, coords);
-              texel = merge(texel, vec4(texture2D( supplementalTexture, coords).rgb, supplementalTextureMix));
+              texel = merge(texel, vec4(texture2D( supplementalTexture, coords).rgb, sMix));
 
               float fv;
               if(isSprite != 0.0 || isLight != 0.0){

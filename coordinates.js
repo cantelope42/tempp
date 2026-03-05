@@ -1215,10 +1215,10 @@ const ProcessOBJData = (data, vInd, nInd, uInd, fInd, ret) => {
                         ...n[2], ...n[3], ...n[0])
       break
     }
-    var l = ret.normals.length - 7
-    var nvx = ret.normals[l+3] - ret.normals[l+0]
-    var nvy = ret.normals[l+4] - ret.normals[l+1]
-    var nvz = ret.normals[l+5] - ret.normals[l+2]
+    //var l = ret.normals.length - 7
+    //var nvx = ret.normals[l+3] - ret.normals[l+0]
+    //var nvy = ret.normals[l+4] - ret.normals[l+1]
+    //var nvz = ret.normals[l+5] - ret.normals[l+2]
   })
 }
 
@@ -1227,8 +1227,7 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
   for(var i = 0; i<ret.uvs.length; i+=2){
     ret.uvs[i+1] = 1-ret.uvs[i+1]
   }
-  var normals = []
-  ret.normalVecs = Array(ret.vertices.length).fill(0)
+  var normals = Array(ret.vertices.length*2).fill(0)
   for(var i = 0; i<ret.vertices.length; i+=3){
     X = ret.vertices[i+0]
     Y = ret.vertices[i+1]
@@ -1244,21 +1243,20 @@ const OBJFinishing = (ret, tx=0, ty=0, tz=0, rl=0, pt=0, yw=0) => {
     Z = ret.normals[i+2]
     var ar = [X,Y,Z]
     ar = R_pyr(...ar, {roll:rl, pitch:pt, yaw:yw})
-    ret.normalVecs[i+0] = ar[0]
-    ret.normalVecs[i+1] = ar[1]
-    ret.normalVecs[i+2] = ar[2]
     normals[i*2+0] = ret.vertices[i+0]
     normals[i*2+1] = ret.vertices[i+1]
     normals[i*2+2] = ret.vertices[i+2]
-    normals[i*2+3] = ret.vertices[i+3] + ar[0]
-    normals[i*2+4] = ret.vertices[i+4] + ar[1]
-    normals[i*2+5] = ret.vertices[i+5] + ar[2]
+    normals[i*2+3] = ret.vertices[i+0] + ar[0]
+    normals[i*2+4] = ret.vertices[i+1] + ar[1]
+    normals[i*2+5] = ret.vertices[i+2] + ar[2]
   }
+  // normals from obj format -> line segs (for optional display), to be converted
+  // and populated as normalVecs in LoadGeometry, for rendering
   ret.normals = normals
 }
 
 const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, involveCache=true) => {
-  var ret = { vertices: [], normals: [], normalVecs: [], uvs: []}
+  var ret = { vertices: [], normals: [], uvs: []}
   
   var a, X, Y, Z
   if(involveCache && (cacheItem = cache.objFiles.filter(v=>v.url == url)).length){
@@ -2413,14 +2411,12 @@ const LoadGeometry = async (renderer, geoOptions) => {
           OBJFinishing(ret)
           vertices    = ret.vertices
           normals     = ret.normals
-          normalVecs  = ret.normalVecs
           uvs         = ret.uvs
           resolved    = true
         }else{
           shape = await LoadOBJ(url, size, 0,0,0,0,0,0, false, true)
           vertices   = shape.vertices
           normals    = shape.normals
-          normalVecs = shape.normalVecs
           uvs        = shape.uvs
         }
       break

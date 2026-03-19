@@ -4100,12 +4100,13 @@ const BasicShader = async (renderer, options=[]) => {
                     //light.rgb *= .5;
                     //light.rgb += .05;
                     float refP1, refP2;
+                    float refMul = cameraMode == 1.0 ? 1.0 : -1.0;
                     if(refOmitEquirectangular != 1.0){
                       //float pitch = cameraMode == 1.0 ? -camOri.y : camOri.y;
                       vec3 reflectionPos = Reflect(vec3(
-                        (fPos.x + geoPos.x * fov) - refCamPos.x * fov,
-                        (fPos.y + geoPos.y * fov) - refCamPos.y * fov,
-                        (fPos.z + geoPos.z * fov * (cameraMode == 1.0 ? 1.0 : -1.0)) - refCamPos.z * fov
+                        (fPos.x + geoPos.x * fov * refMul) - refCamPos.x * fov,
+                        (fPos.y + geoPos.y * fov * refMul) - refCamPos.y * fov,
+                        (fPos.z + geoPos.z * fov * refMul) - refCamPos.z * fov
                       ), refNV);
                       float px = reflectionPos.x;
                       float py = reflectionPos.y;

@@ -4051,7 +4051,7 @@ const BasicShader = async (renderer, options=[]) => {
                     }else{
                       refcOri = -vec3(camOri.x, camOri.y, -camOri.z);
                     }
-                    refNV = refFlatShading == 1.0 ? fsnVec : nVec;
+                    refNV = refFlatShading == 1.0 ? fsnVec : nVeci;
                     if(cameraMode == 1.0){
                       refNV = Quat(refNV, vec3(refcOri.x, 0.0,0.0), 1);
                       refNV = Quat(refNV, vec3(0.0, refcOri.y, 0.0), 1);

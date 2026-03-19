@@ -4097,42 +4097,15 @@ const BasicShader = async (renderer, options=[]) => {
       
                   `,
                   fragCode:            `
-                    uniform float reflection;
-                    uniform float refFlatShading;
-                    uniform float refTheta;
-                    uniform float refOmitEquirectangular;
-                    uniform float refFlipRefs;
-                    uniform sampler2D reflectionMap;
-                    varying vec3 refNV;
-                    varying vec3 refCamPos;
-
-                    vec3 Reflect(vec3 a, vec3 n){
-                      float d1 = sqrt(a.x * a.x + a.y * a.y + a.z * a.z) + 0.00001;
-                      float d2 = sqrt(n.x * n.x + n.y * n.y + n.z * n.z) + 0.00001;
-                      a.x = a.x / d1;
-                      a.y = a.y / d1;
-                      a.z = a.z / d1;
-                      n.x = n.x / d2;
-                      n.y = n.y / d2;
-                      n.z = n.z / d2;
-                      float dot = -a.x*n.x + -a.y*n.y + -a.z*n.z;
-                      float rx = -a.x - 2.0 * n.x * dot;
-                      float ry = -a.y - 2.0 * n.y * dot;
-                      float rz = -a.z - 2.0 * n.z * dot;
-                      return vec3(-rx*d1, -ry*d1, -rz*d1);
-                    }
-      
-                  `,
-                  fragCode:            `
                     //light.rgb *= .5;
                     //light.rgb += .05;
                     float refP1, refP2;
                     if(refOmitEquirectangular != 1.0){
                       //float pitch = cameraMode == 1.0 ? -camOri.y : camOri.y;
                       vec3 reflectionPos = Reflect(vec3(
-                        (fPos.x + geoPos.x) - refCamPos.x * fov,
-                        (fPos.y + geoPos.y) - refCamPos.y * fov,
-                        (fPos.z + geoPos.z) - refCamPos.z * fov
+                        fPos.x - refCamPos.x * fov,
+                        fPos.y - refCamPos.y * fov,
+                        fPos.z - refCamPos.z * fov
                       ), refNV);
                       float px = reflectionPos.x;
                       float py = reflectionPos.y;

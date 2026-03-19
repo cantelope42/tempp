@@ -4104,9 +4104,9 @@ const BasicShader = async (renderer, options=[]) => {
                       //float pitch = cameraMode == 1.0 ? -camOri.y : camOri.y;
                       vec3 reflectionPos = Reflect(vec3(
                         fPos.x - refCamPos.x * fov,
-                        fPos.y - refCamPos.y * fov,
-                        fPos.z - refCamPos.z * fov
-                      ), refNV) * (cameraMode == 0.0 ? 1.0 : -1.0);
+                        fPos.y - refCamPos.y * fov * (cameraMode == 0.0 ? 1.0 : -1.0),
+                        fPos.z - refCamPos.z * fov * (cameraMode == 0.0 ? 1.0 : -1.0)
+                      ), refNV);
                       float px = reflectionPos.x;
                       float py = reflectionPos.y;
                       float pz = reflectionPos.z;

@@ -4051,7 +4051,7 @@ const BasicShader = async (renderer, options=[]) => {
                     }else{
                       refcOri = -vec3(camOri.x, camOri.y, -camOri.z);
                     }
-                    refNV = refFlatShading == 1.0 ? fsnVec : nVeci;
+                    refNV = refFlatShading == 1.0 ? fsnVec : nVec;
                     if(cameraMode == 1.0){
                       refNV = Quat(refNV, vec3(refcOri.x, 0.0,0.0), 1);
                       refNV = Quat(refNV, vec3(0.0, refcOri.y, 0.0), 1);
@@ -4109,7 +4109,7 @@ const BasicShader = async (renderer, options=[]) => {
                       ), refNV);
                       float px = reflectionPos.x;
                       float py = reflectionPos.y;
-                      float pz = reflectionPos.z;
+                      float pz = reflectionPos.z * (cameraMode == 0.0 ? 1.0 : -1.0);
                       
                       
                       refP1 = 0.5+atan(px, pz) / M_PI / 2.0 + 0.5;

@@ -4105,11 +4105,11 @@ const BasicShader = async (renderer, options=[]) => {
                       vec3 reflectionPos = Reflect(vec3(
                         fPos.x - refCamPos.x * fov,
                         fPos.y - refCamPos.y * fov,
-                        fPos.z - refCamPos.z * fov
+                        fPos.z - refCamPos.z * fov * (cameraMode == 0.0 ? 1.0 : -1.0)
                       ), refNV);
                       float px = reflectionPos.x;
                       float py = reflectionPos.y;
-                      float pz = reflectionPos.z * (cameraMode == 0.0 ? 1.0 : -1.0);
+                      float pz = reflectionPos.z;
                       
                       
                       refP1 = 0.5+atan(px, pz) / M_PI / 2.0 + 0.5;

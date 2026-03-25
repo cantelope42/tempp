@@ -1273,6 +1273,7 @@ const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, invol
     })
     cache.objFiles = [...structuredClone(cache.objFiles), {url, ret}]
   }
+  console.log('LoadOBJ -> ', tx, ty, tz)
   OBJFinishing(ret, tx, ty, tz, rl, pt, yw)
   return ret
 }
@@ -6450,8 +6451,6 @@ const GeometryFromRaw = (raw, texCoords, size, subs,
 
 const subbed = (subs, size, sphereize, shape, texCoords, hint='') => {
   
-  console.log('subbed -> ', shape.name)
-
   var base, baseTexCoords, l, X, Y, Z
   var X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3
   var X4, Y4, Z4, X5, Y5, Z5, X6, Y6, Z6

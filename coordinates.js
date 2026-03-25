@@ -6449,6 +6449,8 @@ const GeometryFromRaw = (raw, texCoords, size, subs,
 }
 
 const subbed = (subs, size, sphereize, shape, texCoords, hint='') => {
+  
+  console.log('subbed -> ', shape.name)
 
   var base, baseTexCoords, l, X, Y, Z
   var X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3

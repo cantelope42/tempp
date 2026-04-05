@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>codegolf doodle</title>
+    <style>
+      body, html{
+        min-height: 100vh;
+        margin: 0;
+        background: #000;
+        color: #fff;
+        overflow: hidden;
+      }
+      canvas{
+        object-fit: contain;
+        width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
+        max-width: 100vw;
+        margin-top: 50px;
+        margin-left: 50%;
+        transform: translate(-50%);
+        margin: 0,
+        border: 1px solid #4f84;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id=c>
+    <script>
+      x=c.getContext('2d')
+      c.width = 1920
+      c.height = 1080
+      var S = Math.sin
+      var C = Math.cos
+      var t = 0
+      var S = Math.sin
+      
+      const U = () => {
+      
+        x.fillRect(0,0,w=c.width=240,w)
+        c.height = c.width/1.77777778
+        //r=(a,n)=>[a[0]+2*n[0]*(d=-a[0]*n[0]+-a[1]*n[1]+-a[2]*n[2]),a[1]+2*n[1]*d,a[2]-2*n[2]*d]
+        r=(a,n)=>[-a[0]-2*n[0]*(d=-a[0]*n[0]-a[1]*n[1]),-a[1]-2*n[1]*d]
+
+        x.beginPath()
+        for(k=[],i=3;i--;){
+          p=Math.PI*2/3*i+S(t/3)*16
+          a=[1,0]
+          k.push([X=120+S(p)*40, Y=66+C(t*2)*30+C(p)*40,[-S(q=p+Math.PI/2+Math.PI/5),-C(q)]])
+        x.lineTo(X,Y)
+        }
+        for(m=40;m--;)P=t?[...P,[0,66+C(Math.PI*2/40*m+t*8)*65,2,0,t,2]]:[]
+        P=P.filter(v=>t-v[4]<2)
+        P.map((v,i)=>{
+          x.fillStyle=`hsla(${t*99+i/8},${v[5]<5?0:99}%,50%,.7)`
+          x.fillRect(v[0]+=v[2],v[1]+=v[3]+=v[5]==5?.15:0,v[5],v[5])
+          k.map((q,j)=>{
+            for(m=9;m--;){
+              e=q[0]+(k[(j+2)%3][0]-q[0])/9*m
+              f=q[1]+(k[(j+2)%3][1]-q[1])/9*m
+              if(Math.hypot(e-v[0],f-v[1])<=5){
+                v[5]=5
+                l=r([v[2],v[3]],q[2])
+                v[0]+=v[2]=l[0],v[1]+=v[3]=l[1]
+              }
+            }
+          })
+        })
+        x.fillStyle='#f008'
+        x.fill()
+        t += 1/60
+        requestAnimationFrame(U)
+      }
+      U()
+      
+    </script>
+  </body>
+</html>

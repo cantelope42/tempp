@@ -1273,7 +1273,6 @@ const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, invol
     })
     cache.objFiles = [...structuredClone(cache.objFiles), {url, ret}]
   }
-  console.log('LoadOBJ -> ', tx, ty, tz)
   OBJFinishing(ret, tx, ty, tz, rl, pt, yw)
   return ret
 }
@@ -6450,7 +6449,7 @@ const GeometryFromRaw = (raw, texCoords, size, subs,
 }
 
 const subbed = (subs, size, sphereize, shape, texCoords, hint='') => {
-  
+
   var base, baseTexCoords, l, X, Y, Z
   var X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3
   var X4, Y4, Z4, X5, Y5, Z5, X6, Y6, Z6
@@ -8466,9 +8465,9 @@ const LoadFPSControls = async (renderer, options) => {
     var px  = 0
     var py  = 0
     var pz  = 0
-    var pvx = 0
-    var pvy = 0
-    var pvz = 0
+    renderer.pvx = 0
+    renderer.pvy = 0
+    renderer.pvz = 0
     var accel = 1
     renderer.rdrag = 1.66
     renderer.pdrag = 1.2
@@ -8525,13 +8524,13 @@ const LoadFPSControls = async (renderer, options) => {
       rvx /= renderer.rdrag
       rvy /= renderer.rdrag
       
-      renderer.x += pvx
-      renderer.y += pvy
-      renderer.z += pvz
+      renderer.x += renderer.pvx
+      renderer.y += renderer.pvy
+      renderer.z += renderer.pvz
       if((1||document.activeElement.nodeName == 'CANVAS') && (renderer.hasTraction || renderer.flyMode)){
-        pvx /= renderer.pdrag
-        pvy /= renderer.pdrag
-        pvz /= renderer.pdrag
+        renderer.pvx /= renderer.pdrag
+        renderer.pvy /= renderer.pdrag
+        renderer.pvz /= renderer.pdrag
       }
 
       if(renderer.flyMode && (1||document.activeElement.nodeName == 'CANVAS')){
@@ -8539,14 +8538,14 @@ const LoadFPSControls = async (renderer, options) => {
         var p2 = renderer.pitch
         switch(renderer.mouseButton){
           case 1:
-            pvx -= S(p1) * S(p2) * mv * accel
-            pvy += C(p2) * mv * accel
-            pvz -= C(p1) * S(p2) * mv * accel
+            renderer.pvx -= S(p1) * S(p2) * mv * accel
+            renderer.pvy += C(p2) * mv * accel
+            renderer.pvz -= C(p1) * S(p2) * mv * accel
           break
           case 2:
-            pvx += S(p1) * S(p2) * mv * accel
-            pvy -= C(p2) * mv * accel
-            pvz += C(p1) * S(p2) * mv * accel
+            renderer.pvx += S(p1) * S(p2) * mv * accel
+            renderer.pvy -= C(p2) * mv * accel
+            renderer.pvz += C(p1) * S(p2) * mv * accel
           break
           default:
           break
@@ -8577,46 +8576,46 @@ const LoadFPSControls = async (renderer, options) => {
               var p1 = -renderer.yaw + Math.PI
               var p2 = renderer.pitch + Math.PI / 2
               if(renderer.flyMode){
-                pvx += S(p1) * S(p2) * mv * accel
-                pvy -= C(p2) * mv * accel
-                pvz += C(p1) * S(p2) * mv * accel
+                renderer.pvx += S(p1) * S(p2) * mv * accel
+                renderer.pvy -= C(p2) * mv * accel
+                renderer.pvz += C(p1) * S(p2) * mv * accel
               }else{
-                pvx += S(p1) * mv * accel
-                pvz += C(p1) * mv * accel
+                renderer.pvx += S(p1) * mv * accel
+                renderer.pvz += C(p1) * mv * accel
               }
             break
             case 65:  //a
               var p1 = -renderer.yaw + Math.PI / 2
               var p2 = renderer.pitch + Math.PI / 2
               if(renderer.flyMode){
-                pvx += S(p1) * mv * accel
-                pvz += C(p1) * mv * accel
+                renderer.pvx += S(p1) * mv * accel
+                renderer.pvz += C(p1) * mv * accel
               }else{
-                pvx += S(p1) * mv * accel
-                pvz += C(p1) * mv * accel
+                renderer.pvx += S(p1) * mv * accel
+                renderer.pvz += C(p1) * mv * accel
               }
             break
             case 83:  //s
               var p1 = -renderer.yaw + Math.PI
               var p2 = renderer.pitch + Math.PI / 2
               if(renderer.flyMode){
-                pvx -= S(p1) * S(p2) * mv * accel
-                pvy += C(p2) * mv * accel
-                pvz -= C(p1) * S(p2) * mv * accel
+                renderer.pvx -= S(p1) * S(p2) * mv * accel
+                renderer.pvy += C(p2) * mv * accel
+                renderer.pvz -= C(p1) * S(p2) * mv * accel
               }else{
-                pvx -= S(p1) * mv * accel
-                pvz -= C(p1) * mv * accel
+                renderer.pvx -= S(p1) * mv * accel
+                renderer.pvz -= C(p1) * mv * accel
               }
             break
             case 68:  //d
               var p1 = -renderer.yaw + Math.PI / 2
               var p2 = renderer.pitch + Math.PI / 2
               if(renderer.flyMode){
-                pvx += -S(p1) * mv * accel
-                pvz += -C(p1) * mv * accel
+                renderer.pvx += -S(p1) * mv * accel
+                renderer.pvz += -C(p1) * mv * accel
               }else{
-                pvx += -S(p1) * mv * accel
-                pvz += -C(p1) * mv * accel
+                renderer.pvx += -S(p1) * mv * accel
+                renderer.pvz += -C(p1) * mv * accel
               }
             break
             case 32:  //space
@@ -8807,6 +8806,14 @@ const HSVFromRGB = (R, G, B) => {
   return [hue, sat, val]
 }
 
+const DrawRotatedImage = (image, x, y, width, height, angle, context) => {
+  context.save()
+  context.translate(x, y)
+  context.rotate(-angle)
+  context.drawImage(image, -width/2, -height/2, width, height)
+  context.restore()
+}
+  
 const ShiftArray = (ar, dir) => {
   var ret = Array(ar.length).fill()
   for(var i = 0; i < ar.length; i++){
@@ -9173,6 +9180,7 @@ export {
   ShowBounding,
   ProcessShapeArray,
   ApplyShapeData,
+  DrawRotatedImage,
   GetShaderCoord,
   Reflect,
   Normal,

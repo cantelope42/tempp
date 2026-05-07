@@ -3807,9 +3807,9 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
     vz = ar[2]
   }
 
-  var cpx = renderer.x + renderer.offsetX
-  var cpy = renderer.y + renderer.offsetY
-  var cpz = renderer.z + renderer.offsetZ
+  var cpx = renderer.x - renderer.offsetX
+  var cpy = renderer.y - renderer.offsetY
+  var cpz = renderer.z - renderer.offsetZ
 
   vx += -geometry.x
   vy += geometry.y
@@ -6364,7 +6364,7 @@ const BasicShader = async (renderer, options=[]) => {
           dset.locRenderNormals  = gl.getUniformLocation(dset.program, "renderNormals")
           gl.uniform3f(dset.locCamPos,        renderer.x, renderer.y, renderer.z)
           gl.uniform3f(dset.locCamOri,        renderer.roll, renderer.pitch, renderer.yaw)
-          gl.uniform3f(dset.locGeoPos,        renderer.x, renderer.y, renderer.z)
+          gl.uniform3f(dset.locGeoPos,        geometry.x, geometry.y, geometry.z)
           gl.uniform3f(dset.locGeoOri,        geometry.roll, geometry.pitch, geometry.yaw)
           gl.uniform1f(dset.locFov,           renderer.fov)
           gl.uniform1f(dset.locRenderNormals, 0)

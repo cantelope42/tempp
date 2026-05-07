@@ -69,6 +69,9 @@ const Renderer = async options => {
   var fog             = 0
   var frameCount      = 0
   var rotationMode    = 0
+  var offsetX         = 0
+  var offsetY         = 0
+  var offsetZ         = 0
   var fogColor        = [0,0,0]
   var dataArray       = {
     data: [],
@@ -106,6 +109,9 @@ const Renderer = async options => {
         case 'x': x = options[key]; break
         case 'y': y = options[key]; break
         case 'z': z = options[key]; break
+        case 'offsetx': offsetX = options[key]; break
+        case 'offsety': offsetY = options[key]; break
+        case 'offsetz': offsetZ = options[key]; break
         case 'roll': roll = options[key]; break
         case 'pitch': pitch = options[key]; break
         case 'yaw': yaw = options[key]; break
@@ -182,20 +188,17 @@ const Renderer = async options => {
   })
   
   ret = {
-    // vars & objects
     c, ctx, contextType, t:0, alpha,
     width, height, x, y, z, attachToBody,
     roll, pitch, yaw, fov, context,
+    offsetX, offsetY, offsetZ,
     ready: false, ambientLight, clearColor,
     pointLights, pointLightCols, dataArray, glowQueue,
     alphaQueue, particleQueue, lineQueue, active,
     cameraMode, showCrosshair, crosshairSel,
     crosshairMap, pageX, pageY, mouseX, mouseY, frameCount,
     mouseButton, rsz, margin, optionalPlugins, fogColor,
-    rotationMode
-    
-    // functions
-    // ...
+    rotationMode,
   }
   rsz()
   ret[contextType == '2d' ? 'ctx' : 'gl'] = ctx
@@ -242,7 +245,8 @@ const Renderer = async options => {
          geometry.isLine ||
          geometry.isParticle ||
          geometry.isLight ||
-         geometry.isSprite
+         geometry.isSprite ||
+         geometry.shapeArrayIsSprite
          ) {
         ctx.blendFunc(ctx.SRC_ALPHA, ctx.ONE)
         ctx.enable(ctx.BLEND)
@@ -252,7 +256,9 @@ const Renderer = async options => {
       }else{
         //ctx.disable(ctx.CULL_FACE)
         if(geometry.shapeType != 'sprite' ||
-           (geometry.shapeType != 'point light' && geometry.showSource)) ctx.disable(ctx.BLEND)
+           (geometry.shapeType != 'point light' && geometry.showSource)){
+          ctx.disable(ctx.BLEND)
+        }
       }
 
       var equirectangularPlugin, omitSplitCheck
@@ -279,7 +285,8 @@ const Renderer = async options => {
       if(typeof geometry?.shader != 'undefined'){
         
         // depth + alpha bugfix
-        if(!sortedPass && (geometry.isSprite || (geometry.isLight && geometry.showSource))) {
+        if(!sortedPass && (geometry.isSprite ||
+           geometry.shapeArrayIsSprite || (geometry.isLight && geometry.showSource))) {
           var queueType
           switch(geometry.shapeType){
             case 'sprite'  : case 'point light': queueType = 'alphaQueue'; break
@@ -412,9 +419,10 @@ const Renderer = async options => {
               ctx.uniform1f(dset.locIsLine,          geometry.isLine)
               ctx.uniform1f(dset.locPenumbraPass,    geometry.penumbraPass ? 1 : 0)
               
-              ctx.uniform1f(dset.locT,               renderer.t)
-              ctx.uniform1f(dset.locColorMix,        geometry.colorMix)
-              ctx.uniform1f(dset.locIsSprite,        geometry.isSprite)
+              ctx.uniform1f(dset.locT,        renderer.t)
+              ctx.uniform1f(dset.locColorMix, geometry.colorMix)
+              ctx.uniform1f(dset.locIsSprite, geometry.isSprite ? 1.0 : 0.0)
+              ctx.uniform1f(dset.locShapeArrayIsSprite, geometry.shapeArrayIsSprite ? 1.0 : 0.0)
               ctx.uniform1f(dset.locIsLight,         geometry.isLight)
               
               ctx.uniform1f(dset.locCameraMode,      
@@ -430,7 +438,9 @@ const Renderer = async options => {
               ctx.uniform2f(dset.locResolution,      renderer.width, renderer.height)
               ctx.uniform3f(dset.locCamPos,          renderer.x, renderer.y, renderer.z)
               ctx.uniform3f(dset.locCamOri,          renderer.roll, renderer.pitch, renderer.yaw)
-              ctx.uniform3f(dset.locGeoPos,          geometry.x, geometry.y, geometry.z)
+              ctx.uniform3f(dset.locGeoPos,          geometry.x + renderer.offsetX,
+                                                     geometry.y + renderer.offsetY,
+                                                     geometry.z + renderer.offsetZ)
               ctx.uniform3f(dset.locGeoOri,          geometry.roll, geometry.pitch, geometry.yaw)
               ctx.uniform1f(dset.locFov,             renderer.fov)
               ctx.uniform1f(dset.locEquirectangular, geometry.equirectangular ? 1.0 : 0.0)
@@ -512,6 +522,10 @@ const Renderer = async options => {
                   tvib = geometry.Vertex_Index_Buffer
                   tgvb = geometry.vertex_buffer
                   tgvi = geometry.vIndices
+                }
+                
+                if(geometry.isPartitioned){
+                  tvertices = new Float32Array(geometry.partitions.parts[0].vertices)
                 }
                 
                 var toffsets = []
@@ -908,7 +922,8 @@ const Renderer = async options => {
               ctx.uniform1f(dset.locIsLine,          geometry.isLine)
               ctx.uniform1f(dset.locPenumbraPass,    0)
               ctx.uniform1f(dset.locColorMix,        geometry.colorMix)
-              ctx.uniform1f(dset.locIsSprite,        geometry.isSprite)
+              ctx.uniform1f(dset.locIsSprite, geometry.isSprite ? 1.0 : 0.0)
+              ctx.uniform1f(dset.locShapeArrayIsSprite, geometry.shapeArrayIsSprite ? 1.0 : 0.0)
               ctx.uniform1f(dset.locIsLight,         geometry.isLight)
               
               ctx.uniform1f(dset.locCameraMode,      
@@ -920,13 +935,111 @@ const Renderer = async options => {
               ctx.uniform2f(dset.locResolution,      renderer.width, renderer.height)
               ctx.uniform3f(dset.locCamPos,          renderer.x, renderer.y, renderer.z)
               ctx.uniform3f(dset.locCamOri,          renderer.roll, renderer.pitch, renderer.yaw)
-              ctx.uniform3f(dset.locGeoPos,          geometry.x, geometry.y, geometry.z)
+              ctx.uniform3f(dset.locGeoPos,          geometry.x + renderer.offsetX,
+                                                     geometry.y + renderer.offsetY,
+                                                     geometry.z + renderer.offsetZ)
               ctx.uniform3f(dset.locGeoOri,          geometry.roll, geometry.pitch, geometry.yaw)
               ctx.uniform1f(dset.locFov,             renderer.fov)
               ctx.uniform1f(dset.locEquirectangular, geometry.equirectangular ? 1.0 : 0.0)
               ctx.uniform1f(dset.locRenderNormals,   0)
 
 
+
+              var tvertices
+              var tnormals
+              var tuvs
+              var tnormalVecs
+              var tflatShadingNormalVecs
+              var toffsets
+              if(geometry.isPartitioned){
+                var px, py, pz
+                if(renderer.cameraMode == 'fps'){
+                  px = -renderer.x
+                  py = -renderer.y
+                  pz = -renderer.z
+                }else{
+                  var d = Math.hypot(renderer.x, renderer.y, renderer.z)
+                  px = 0
+                  py = 0
+                  pz = -d
+                  d = Math.hypot(py, pz)
+                  p = Math.atan2(py, pz) + renderer.pitch
+                  py = S(p) * d
+                  pz = C(p) * d
+                  d = Math.hypot(px, pz)
+                  p = Math.atan2(px, pz) - renderer.yaw
+                  px = S(p) * d
+                  pz = C(p) * d
+                }
+                
+                var ctX = geometry.partitions.ctX
+                var ctY = geometry.partitions.ctY
+                var ctZ = geometry.partitions.ctZ
+                
+                var ls = geometry.partitionRadius
+                var verts = []
+                var uvs = []
+                var normalVecs = []
+                var normals = []
+                var offsets = []
+                var flatShadingNormalVecs = []
+                var tgvi
+                var tgoi
+                var tgui
+                var tgnvi
+                var tfsnvi
+                var tgni
+                geometry.partitions.parts.forEach((part, pIdx) => {
+                  var cx = part.cx
+                  var cy = part.cy
+                  var cz = part.cz
+                  if(Math.hypot(cx-px, cy-py, cz-pz) < ls){
+                    for(var i = 0; i < part.vertices.length; i++)
+                      verts.push(part.vertices[i])
+                    for(var i = 0; i < part.offsets.length; i++)
+                      offsets.push(part.offsets[i])
+                    for(var i = 0; i < part.uvs.length; i++)
+                      uvs.push(part.uvs[i])
+                    for(var i = 0; i < part.normalVecs.length; i++)
+                      normalVecs.push(part.normalVecs[i])
+                    for(var i = 0; i < part.flatShadingNormalVecs.length; i++)
+                      flatShadingNormalVecs.push(part.flatShadingNormalVecs[i])
+                    if(geometry.showNormals)
+                      for(var i = 0; i < part.normals.length; i++)
+                        normals.push(part.normals[i])
+                  }
+                })
+                tvertices = new Float32Array(verts)
+                toffsets = new Float32Array(offsets)
+                tuvs = new Float32Array(uvs)
+                tnormalVecs= new Float32Array(normalVecs)
+                tflatShadingNormalVecs = new Float32Array(flatShadingNormalVecs)
+                if(geometry.showNormals)
+                  tnormals = new Float32Array(normals)
+                var tgvi = new Uint32Array( Array(tvertices.length/3|0).fill().map((v,i)=>i) )
+                var tgoi = new Uint32Array( Array(toffsets.length/3|0).fill().map((v,i)=>i) )
+                var tgui = new Uint32Array( Array(tuvs.length/2|0).fill().map((v,i)=>i) )
+                var tgnvi = new Uint32Array( Array(tnormalVecs.length/3|0).fill().map((v,i)=>i) )
+                var tfsnvi = new Uint32Array( Array(tflatShadingNormalVecs.length/3|0).fill().map((v,i)=>i) )
+                
+                if(geometry.showNormals)
+                  var tgni = new Uint32Array( Array(tnormals.length/3|0).fill().map((v,i)=>i) )
+              }else{
+                tvertices = geometry.vertices
+                toffsets = geometry.offsets
+                tuvs = geometry.uvs
+                tnormalVecs = geometry.normalVecs
+                tflatShadingNormalVecs = geometry.flatShadingNormalVecs
+                if(geometry.showNormals)
+                  tnormals = geometry.normals
+                tgvi = geometry.vIndices
+                tgni = geometry.nIndices
+                tgnvi = geometry.nVecIndices
+                tfsnvi = geometry.fsnVecIndices
+                tgui = geometry.uvIndices
+                tgoi = geometry.oIndices
+              }
+              
               // dynamically resize UVs, if needed
               
               if(geometry.oScaleUVX != geometry.scaleUVX ||
@@ -941,9 +1054,9 @@ const Renderer = async options => {
 
               // bind buffers
               ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.uv_buffer)
-              ctx.bufferData(ctx.ARRAY_BUFFER, geometry.uvs, ctx.STATIC_DRAW)
+              ctx.bufferData(ctx.ARRAY_BUFFER, tuvs, ctx.STATIC_DRAW)
               ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.UV_Index_Buffer)
-              ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.uvIndices, ctx.STATIC_DRAW)
+              ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tgui, ctx.STATIC_DRAW)
               ctx.vertexAttribPointer(dset.locUv , 2, ctx.FLOAT, false, 0, 0)
               ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null)
               ctx.bindBuffer(ctx.ARRAY_BUFFER, null)
@@ -952,9 +1065,9 @@ const Renderer = async options => {
               //normals
               if(geometry?.normalVecs.length){
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.normalVec_buffer)
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.normalVecs, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ARRAY_BUFFER, tnormalVecs, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.NormalVec_Index_Buffer)
-                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.nVecIndices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tgnvi, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.normalVec_buffer)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.NormalVec_Index_Buffer)
                 dset.locNormalVec= ctx.getAttribLocation(dset.program, "normalVec")
@@ -969,9 +1082,9 @@ const Renderer = async options => {
               
               if(geometry.flatShadingNormalVecs.length){
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.flatShadingNormalVec_buffer)
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.flatShadingNormalVecs, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ARRAY_BUFFER, tflatShadingNormalVecs, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.FlatShadingNormalVec_Index_Buffer)
-                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.fsnVecIndices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tfsnvi, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.flatShadingNormalVec_buffer)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.FlatShadingNormalVec_Index_Buffer)
                 dset.locFlatShadingNormalVec= ctx.getAttribLocation(dset.program, "flatShadingNormalVec")
@@ -981,34 +1094,30 @@ const Renderer = async options => {
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, null)
               }
-              
 
               // vertices
               
-              if(geometry?.vertices?.length){
-                
-                ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.vertex_buffer)
-                
+              if(geometry?.vertices?.length && tvertices.length){
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Vertex_Index_Buffer)
-                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.vIndices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tgvi, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.vertex_buffer)
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.vertices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ARRAY_BUFFER, tvertices, ctx.STATIC_DRAW)
                 dset.locPosition = ctx.getAttribLocation(dset.program, "position")
                 ctx.vertexAttribPointer(dset.locPosition, 3, ctx.FLOAT, false, 0, 0)
                 ctx.enableVertexAttribArray(dset.locPosition)
 
                 // offsets
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.offset_buffer)
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.offsets, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ARRAY_BUFFER, toffsets, ctx.STATIC_DRAW)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Offset_Index_Buffer)
-                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.oIndices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tgoi, ctx.STATIC_DRAW)
                 dset.locOffset = ctx.getAttribLocation(dset.program, "offset")
                 ctx.vertexAttribPointer(dset.locOffset, 3, ctx.FLOAT, false, 0, 0)
                 ctx.enableVertexAttribArray(dset.locOffset)
-
+                
                 ctx.drawElements(geometry.wireframe ? ctx.LINE_STRIP :
                                     ctx.TRIANGLES,
-                                  geometry.vertices.length/3|0,
+                                  tvertices.length/3|0,
                                   ctx.UNSIGNED_INT,0)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, null)
@@ -1020,13 +1129,13 @@ const Renderer = async options => {
               if(geometry.showNormals && geometry?.normals?.length){
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.normal_buffer)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Normal_Index_Buffer)
-                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.nIndices, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, tgni, ctx.STATIC_DRAW)
                 dset.locNormal = ctx.getAttribLocation(dset.program, "normal")
                 ctx.vertexAttribPointer(dset.locNormal, 3, ctx.FLOAT, false, 0, 0)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.normal_buffer)
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.normals, ctx.STATIC_DRAW)
+                ctx.bufferData(ctx.ARRAY_BUFFER, tnormals, ctx.STATIC_DRAW)
                 ctx.enableVertexAttribArray(dset.locNormal)
-                ctx.drawElements(ctx.LINES, geometry.normals.length/3|0, ctx.UNSIGNED_INT,0)
+                ctx.drawElements(ctx.LINES, tnormals.length/3|0, ctx.UNSIGNED_INT,0)
                 ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null)
                 ctx.bindBuffer(ctx.ARRAY_BUFFER, null)
               }
@@ -1067,13 +1176,11 @@ const ResizeRenderer = (renderer, width, height) => {
   renderer.c.width = width
   renderer.c.height = height
   renderer.rsz()
-  switch(renderer.ctx.mode){
+  switch(renderer.context.mode){
     case '2d':
     break
     default:
       renderer.ctx.viewport(0, 0, renderer.c.width, renderer.c.height)
-      //Overlay.c.width = renderer.c.width
-      //Overlay.c.height = renderer.c.height
     break
   }
 }
@@ -1209,10 +1316,12 @@ const ProcessOBJData = (data, vInd, nInd, uInd, fInd, ret) => {
         ret.vertices.push(
                         ...v[0], ...v[1], ...v[2],
                         ...v[2], ...v[3], ...v[0])
-        if(u.length) ret.uvs.push(
+        if(u.length && typeof u[0] != 'undefined')
+                      ret.uvs.push(
                         ...u[0], ...u[1], ...u[2],
                         ...u[2], ...u[3], ...u[0])
-        if(n.length) ret.normals.push(
+        if(n.length && typeof n[0] != 'undefined')
+                      ret.normals.push(
                         ...n[0], ...n[1], ...n[2],
                         ...n[2], ...n[3], ...n[0])
       break
@@ -1263,18 +1372,40 @@ const LoadOBJ = async (url, scale, tx, ty, tz, rl, pt, yw, recenter=false, invol
   var a, X, Y, Z
   if(involveCache && (cacheItem = cache.objFiles.filter(v=>v.url == url)).length){
     ret = cacheItem[0].ret
+    return ret
   }else{
     var vInd = []
     var nInd = []
     var uInd = []
-    var fInd = []
-    await fetch(url).then(res=>res.text()).then(data => {
-      ProcessOBJData(data, vInd, nInd, uInd, fInd, ret)
-    })
-    cache.objFiles = [...structuredClone(cache.objFiles), {url, ret}]
+    var fInd = [] 
+    if(url.toLowerCase().substr(url.length-4) == '.zip'){
+      var brk = 'PK'
+      await fetch(url).then(res=>res.blob()).then(async data => {
+        ;await (new zip.ZipReader(await new zip.BlobReader(data))).getEntries()
+        .then( async res => {
+          var el = await res[0].getData(new zip.BlobWriter())
+          await el.text().then(data=>{
+            var ct = 0
+            brk = data.substr(0,2)
+            do{ ct++ }while(brk=='PK');
+            ProcessOBJData(data, vInd, nInd, uInd, fInd, ret)
+            brk = true
+          })
+        })
+        var ct=0
+        do{ ct++ }while(brk=='PK');
+        OBJFinishing(ret, tx, ty, tz, rl, pt, yw)
+      })
+      return ret
+    }else{
+      await fetch(url).then(res=>res.text()).then(data => {
+        ProcessOBJData(data, vInd, nInd, uInd, fInd, ret)
+      })
+      cache.objFiles = [...structuredClone(cache.objFiles), {url, ret}]
+      OBJFinishing(ret, tx, ty, tz, rl, pt, yw)
+      return ret
+    }
   }
-  OBJFinishing(ret, tx, ty, tz, rl, pt, yw)
-  return ret
 }
 
 const Q = (X, Y, Z, c, AR=700) => [c.width/2+X/Z*AR, c.height/2+Y/Z*AR]
@@ -1666,6 +1797,12 @@ const DownloadCustomShape = geo => {
   var normalVecs            = []
   var flatShadingNormalVecs = []
   var uvs                   = []
+  var oCamX                 = ''
+  var oCamY                 = ''
+  var oCamZ                 = ''
+  var oCamRoll              = ''
+  var oCamPitch             = ''
+  var oCamYaw               = ''
   var stride                = ''
   var vstate                = []
   var fsnvstate             = []
@@ -1810,6 +1947,9 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var url                      = ''
   var name                     = ''
   var size                     = 1
+  var isPartitioned            = false
+  var partitionSize            = 1e5
+  var partitionRadius          = 0
   var averageNormals           = false
   var subs                     = 0
   var sphereize                = 0
@@ -1905,6 +2045,9 @@ const LoadGeometry = async (renderer, geoOptions) => {
       case 'equirectangularheightmap' : equirectangularHeightmap = !!geoOptions[key]; break
       case 'flipnormals'        : flipNormals = !!geoOptions[key]; break
       case 'shownormals'        : showNormals = !!geoOptions[key]; break
+      case 'ispartitioned'      : isPartitioned = !!geoOptions[key]; break
+      case 'partitionsize'      : partitionSize = +geoOptions[key]; break
+      case 'partitionradius'    : partitionRadius = +geoOptions[key]; break
       case 'syncnormals'        : syncNormals = !!geoOptions[key]; break
       case 'offsetx'            : offsetX = geoOptions[key]; break
       case 'offsety'            : offsetY = geoOptions[key]; break
@@ -1979,6 +2122,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
       case 'showbounding'       : showBounding = !!geoOptions[key]; break
       case 'issprite'           :
         isSprite = (!!geoOptions[key]) ? 1.0: 0.0; break
+      case 'shapearrayissprite'           :
+        shapeArrayIsSprite = (!!geoOptions[key]) ? 1.0: 0.0; break
       case 'islight'            :
         isLight = (!!geoOptions[key]) ? 1.0: 0.0; break
       case 'isparticle'         :
@@ -2043,6 +2188,13 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var nvstate               = []
   var fsnvstate             = []
   var stride                = ''
+  var oCamX                 = ''
+  var oCamY                 = ''
+  var oCamZ                 = ''
+  var oCamRoll              = ''
+  var oCamPitch             = ''
+  var oCamYaw               = ''
+  var partitions            = []
 
   var fileURL, hint
   var resolvedFromCache = false
@@ -2055,10 +2207,10 @@ const LoadGeometry = async (renderer, geoOptions) => {
     if(subs < 5 && hint){
       var fileBase
       if(1)switch(hint){
-        case 'cylinder_0':
-        case 'cylinder_1':
-        case 'cylinder_2':
-        case 'cylinder_3':
+        //case 'cylinder_0':
+        //case 'cylinder_1':
+        //case 'cylinder_2':
+        //case 'cylinder_3':
         case 'torus_0':
         case 'torus knot_0':
         case 'tetrahedron_0':
@@ -2123,20 +2275,14 @@ const LoadGeometry = async (renderer, geoOptions) => {
                 if(data?.flatShadingNormalVecs) {
                   flatShadingNormalVecs = data.flatShadingNormalVecs.map(v=>-v)
                 }
-                if(data?.stride) geometry.stride = data.stride
-                if(data?.fsnvstate) {
-                  fsnvstate = data.shapeData.map(v=>v)
-                }
+                if(data?.stride) stride = data.stride
+                if(data?.fsnvstate) fsnvstate= data.shapeData.map(v=>v)
                 if(data?.shapeData) {
                   isShapeArray = true
                   shapeData = data.shapeData.map(v=>v)
                 }
-                if(data?.vstate) {
-                  vstate = data.vstate.map(v=>v)
-                }
-                if(data?.nvstate) {
-                  nvstate = data.nvstate.map(v=>v)
-                }
+                if(data?.vstate) vstate = data.vstate.map(v=>v)
+                if(data?.nvstate) nvstate = data.nvstate.map(v=>v)
                 //if(data?.uvstate) {
                 //  uvs = data.uvstate.map(v=>-v)
                 //}else{
@@ -2190,51 +2336,70 @@ const LoadGeometry = async (renderer, geoOptions) => {
             normalVecs  = geometryData.normalVecs
             uvs         = geometryData.uvs
 
-
-            if(geometryData?.stride) stride = geometryData.stride
-            if(geometryData?.fsnvstate) {
-              fsnvstate= geometryData.shapeData.map(v=>v)
-            }
-            if(geometryData?.shapeData) {
+            if(data?.stride) stride = data.stride
+            if(data?.fsnvstate) fsnvstate= data.shapeData.map(v=>v)
+            if(data?.shapeData) {
               isShapeArray = true
-              shapeData = geometryData.shapeData.map(v=>v)
+              shapeData = data.shapeData.map(v=>v)
             }
-            if(geometryData?.vstate) {
-              vstate = geometryData.vstate.map(v=>v)
-            }
-            if(geometryData?.nvstate) {
-              nvstate = geometryData.nvstate.map(v=>v)
-            }
+            if(data?.vstate) vstate = data.vstate.map(v=>v)
+            if(data?.nvstate) nvstate = data.nvstate.map(v=>v)
 
             resolved    = true
             //cache.customShapes.push({data: structuredClone(geometryData), url})
           }else{
-            await fetch(fileURL).then(res=>res.json()).then(data=>{
-              if(data?.normalAssocs) normalAssocs = data.normalAssocs
-              if(data?.flatShadingNormalVecs) flatShadingNormalVecs = data.flatShadingNormalVecs
-              vertices     = data.vertices
-              normals      = data.normals
-              normalVecs   = data.normalVecs
-              uvs          = data.uvs
-
-              if(data?.stride) stride = data.stride
-              if(data?.fsnvstate) {
-                fsnvstate= data.shapeData.map(v=>v)
-              }
-              if(data?.shapeData) {
-                isShapeArray = true
-                shapeData = data.shapeData.map(v=>v)
-              }
-              if(data?.vstate) {
-                vstate = data.vstate.map(v=>v)
-              }
-              if(data?.nvstate) {
-                nvstate = data.nvstate.map(v=>v)
-              }
-
-              resolved     = true
-              cache.customShapes.push({data: structuredClone(data), url})
-            })
+            if(fileURL.toLowerCase().substr(fileURL.length-4) == '.zip'){
+              var brk = 'PK'
+              await fetch(fileURL).then(res=>res.blob()).then(async data => {
+                ;await (new zip.ZipReader(await new zip.BlobReader(data))).getEntries()
+                .then( async res => {
+                  var el = await res[0].getData(new zip.BlobWriter())
+                  await el.text().then(data=>{
+                    var ct = 0
+                    brk = data.substr(0,2)
+                    do{ ct++ }while(brk=='PK');
+                    data = JSON.parse(data)
+                    if(data?.normalAssocs) normalAssocs = data.normalAssocs
+                    if(data?.flatShadingNormalVecs) flatShadingNormalVecs = data.flatShadingNormalVecs
+                    vertices     = data.vertices
+                    normals      = data.normals
+                    normalVecs   = data.normalVecs
+                    uvs          = data.uvs
+                    if(data?.stride) stride = data.stride
+                    if(data?.fsnvstate) fsnvstate= data.shapeData.map(v=>v)
+                    if(data?.shapeData) {
+                      isShapeArray = true
+                      shapeData = data.shapeData.map(v=>v)
+                    }
+                    if(data?.vstate) vstate = data.vstate.map(v=>v)
+                    if(data?.nvstate) nvstate = data.nvstate.map(v=>v)
+                    resolved     = true
+                    cache.customShapes.push({data: structuredClone(data), url})
+                  })
+                })
+                var ct=0
+                do{ ct++ }while(brk=='PK');
+              })
+            }else{
+              await fetch(fileURL).then(res=>res.json()).then(data=>{
+                if(data?.normalAssocs) normalAssocs = data.normalAssocs
+                if(data?.flatShadingNormalVecs) flatShadingNormalVecs = data.flatShadingNormalVecs
+                vertices     = data.vertices
+                normals      = data.normals
+                normalVecs   = data.normalVecs
+                uvs          = data.uvs
+                if(data?.stride) stride = data.stride
+                if(data?.fsnvstate) fsnvstate= data.shapeData.map(v=>v)
+                if(data?.shapeData) {
+                  isShapeArray = true
+                  shapeData = data.shapeData.map(v=>v)
+                }
+                if(data?.vstate) vstate = data.vstate.map(v=>v)
+                if(data?.nvstate) nvstate = data.nvstate.map(v=>v)
+                resolved     = true
+                cache.customShapes.push({data: structuredClone(data), url})
+              })
+            }
           }
         }
       break
@@ -2314,6 +2479,12 @@ const LoadGeometry = async (renderer, geoOptions) => {
         })
       break
       case 'cylinder':
+        shape = await LoadOBJ(`${ModuleBase}/prebuilt%20shapes/cylinder.obj`,
+                        size, 0,0,0,0,0,0, false, true)
+        vertices = shape.vertices
+        normals  = shape.normals
+        uvs      = shape.uvs
+        /*
         shape = await Cylinder(size, subs, rows, cols, sphereize,
                       flipNormals, shapeType)
         shape.geometry.map(v => {
@@ -2321,6 +2492,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
           normals.push(...v.normal)
           uvs.push(...v.texCoord)
         })
+        */
       break
       case 'dynamic':
         shape = await GeometryFromRaw(geometryData, texCoords,
@@ -2989,14 +3161,14 @@ const LoadGeometry = async (renderer, geoOptions) => {
   
   //vertics, indices
   vertex_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   vIndices = new Uint32Array( Array(vertices.length/3).fill().map((v,i)=>i) )
   Vertex_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Vertex_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, vIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Vertex_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, vIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 
 
   if(offsetX || offsetY || offsetZ){
@@ -3010,62 +3182,63 @@ const LoadGeometry = async (renderer, geoOptions) => {
   }
   //offsets, indices
   offset_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, offset_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, offsets, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, offset_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, offsets, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   oIndices = new Uint32Array( Array(offsets.length/3).fill().map((v,i)=>i) )
   Offset_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Offset_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, oIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Offset_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, oIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 
   
   //normals, indices
   normalVec_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, normalVec_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, normalVecs, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, normalVec_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, normalVecs, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   nVecIndices = new Uint32Array( Array(normalVecs.length/3).fill().map((v,i)=>i) )
   NormalVec_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, NormalVec_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, nVecIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, NormalVec_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, nVecIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
   
   //normals, indices (for flat shading)
   flatShadingNormalVec_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, flatShadingNormalVec_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, flatShadingNormalVecs, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, flatShadingNormalVec_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, flatShadingNormalVecs, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   fsnVecIndices = new Uint32Array( Array(flatShadingNormalVecs.length/3).fill().map((v,i)=>i) )
   FlatShadingNormalVec_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, FlatShadingNormalVec_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fsnVecIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, FlatShadingNormalVec_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fsnVecIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
   
   //normal lines for drawing, indices
   normal_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, normal_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, normal_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   nIndices = new Uint32Array( Array(normals.length/3).fill().map((v,i)=>i) )
   Normal_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Normal_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, nIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, Normal_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, nIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 
   //uvs, indices
   uv_buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, uv_buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, uvs, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, uv_buffer)
+  //gl.bufferData(gl.ARRAY_BUFFER, uvs, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ARRAY_BUFFER, null)
   uvIndices = new Uint32Array( Array(uvs.length/2).fill().map((v,i)=>i) )
   UV_Index_Buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, UV_Index_Buffer)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, uvIndices, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, UV_Index_Buffer)
+  //gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, uvIndices, gl.STATIC_DRAW)
+  //gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
 
   if(equirectangular == -1) equirectangular = false
   if(equirectangularHeightmap == -1) equirectangularHeightmap = false
+
 
   var updateGeometry = {
     x, y, z, rows, cols,
@@ -3097,16 +3270,21 @@ const LoadGeometry = async (renderer, geoOptions) => {
     heightmapDataArrayWidth, heightmapDataArrayHeight,
     rebindTextures, exportAsOBJ, downloadAsOBJ,
     resolved, isShapeArray, shapeArrayIsSprite,
-    flatShadingNormalVecs, fsnVecIndices,
+    flatShadingNormalVecs, fsnVecIndices, partitions,
     flatShadingNormalVec_buffer, scaleUVX, scaleUVY,
     FlatShadingNormalVec_Index_Buffer, fsnvstate,
     nstate, vstate, nvstate, shapeData, stride,
-    oUvs, oScaleUVX, oScaleUVY
+    oUvs, oScaleUVX, oScaleUVY, isPartitioned,
+    partitionSize, partitionRadius, oCamX, oCamY, oCamZ,
+    oCamRoll, oCamPitch, oCamYaw,
   }
+  
+  
   Object.keys(updateGeometry).forEach((key, idx) => {
     geometry[key] = updateGeometry[key]
   })
   
+  if(partitionSize != 1e5) InitPartitioning(geometry)
   
   if(geometry.shapeType == 'particles' || isParticle ||
      geometry.shapeType == 'lines' || isLine) {
@@ -3270,8 +3448,115 @@ const VideoToImage = video => {
   return scratchCanvas
 }
 
- 
- 
+const InitPartitioning = geometry => {
+  var g = geometry
+  var ax=0, ay=0, az=0, ct=0
+  var minX = 1e6
+  var minY = 1e6
+  var minZ = 1e6
+  var maxX = -1e6
+  var maxY = -1e6
+  var maxZ = -1e6
+  var x = 0, y = 0, z = 0
+  for(var i = 0; i < g.vertices.length; i+=9){
+    for(var m = 0; m < 3; m++){
+      x = g.vertices[i+0+m*3]
+      y = g.vertices[i+1+m*3]
+      z = g.vertices[i+2+m*3]
+      if(x < minX) minX = x
+      if(y < minY) minY = y
+      if(z < minZ) minZ = z
+      if(x > maxX) maxX = x
+      if(y > maxY) maxY = y
+      if(z > maxZ) maxZ = z
+    }
+  }
+  var ctX = ((maxX-minX) / g.partitionSize | 0) + 1
+  var ctY = ((maxY-minY) / g.partitionSize | 0) + 1
+  var ctZ = ((maxZ-minZ) / g.partitionSize | 0) + 1
+  g.partitions = {
+    ctX, ctY, ctZ,
+    minX, maxX,
+    minY, maxY,
+    minZ, maxZ,
+    parts: Array(ctX*ctY*ctZ).fill().map((v, i) => {
+      return {
+        cx: 0,
+        cy: 0,
+        cz: 0,
+        vertices: [],
+        uvs: [],
+        normals: [],
+        normalVecs: [],
+        offsets: [],
+        flatShadingNormalVecs: [],
+      }
+    })
+  }
+  
+  for(var i = 0; i < g.vertices.length; i+=9){
+    ax = 0
+    ay = 0
+    az = 0
+    ct = 0
+    for(var m = 0; m < 3; m++){
+      ax += g.vertices[i+0+m*3]
+      ay += g.vertices[i+1+m*3]
+      az += g.vertices[i+2+m*3]
+      ct++
+    }
+    ax /= ct
+    ay /= ct
+    az /= ct
+    var px = ((ax - minX) / g.partitionSize | 0)
+    var py = ((ay - minY) / g.partitionSize | 0)
+    var pz = ((az - minZ) / g.partitionSize | 0)
+    var part = px + py * ctX + pz * ctX * ctY
+    g.partitions.parts[part].cx = ax
+    g.partitions.parts[part].cy = ay
+    g.partitions.parts[part].cz = az
+    for(var m = 0; m<9; m++){
+      g.partitions.parts[part].vertices.push(g.vertices[i+m])
+      g.partitions.parts[part].flatShadingNormalVecs.push(g.flatShadingNormalVecs[i+m])
+      g.partitions.parts[part].normalVecs.push(g.normalVecs[i+m])
+      g.partitions.parts[part].offsets.push(g.offsets[i+m])
+      g.partitions.parts[part].normals.push(g.normals[(i+m)*2])
+      g.partitions.parts[part].normals.push(g.normals[(i+m)*2+9])
+    }
+    for(var m = 0; m<6; m++){
+      g.partitions.parts[part].uvs.push(g.uvs[i/3*2+m])
+    }
+    
+    /*
+    for(var m = 0; m < 3; m++){
+      ax += g.vertices[i+0+m*3]
+      ay += g.vertices[i+1+m*3]
+      az += g.vertices[i+2+m*3]
+      ct++
+    }
+    ax /= ct
+    ay /= ct
+    az /= ct
+    
+    for(var m = 0; m < 3; m++){
+      for(var k = 0; k < 3; k++){
+        var idx = i+m*3+k
+        var px = (ax+(maxX-minX)/2)/g.partitionSize | 0
+        var py = (ay+(maxY-minY)/2)/g.partitionSize | 0
+        var pz = (az+(maxZ-minZ)/2)/g.partitionSize | 0
+        var part = px + py * ctX + pz * ctX * ctY
+        g.partitions.parts[part].vertices.push(g.vertices[idx])
+        g.partitions.parts[part].uvs.push(g.uvs[idx])
+        g.partitions.parts[part].normalVecs.push(g.normalVecs[idx])
+        g.partitions.parts[part].normals.push(g.normals[i*2+m*6+k*2])
+        g.partitions.parts[part].normals.push(g.normals[i*2+m*6+k*2+3])
+      }
+    }
+    */
+  }
+  geometry.isPartitioned = true
+}  
+
 const BindImage = (gl, resource, binding, textureMode='image', tval=-1, geometry={}, involveCache = true) => {
   let texImage
   switch(textureMode){
@@ -3498,7 +3783,8 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
   
   vy *= -1
   
-  if(!(geometry.isLight || geometry.isSprite)){
+  if(!(geometry.isLight || geometry.isSprite ||
+       geometry.shapeArrayIsSprite)){
     ar = R_ryp(vx, vy, vz, {
       roll:  geometry.roll * (geometry.isParticle || geometry.isLine ? 1: 1) + .0001,
       pitch: geometry.pitch * (geometry.isParticle || geometry.isLine ? 1: 1),
@@ -3509,7 +3795,8 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
     vz = -ar[2]  * (geometry.isParticle || geometry.isLine ? 1: 1)
   }
 
-  if(geometry.isLight || geometry.isSprite){
+  if(geometry.isLight || geometry.isSprite ||
+     geometry.shapeArrayIsSprite){
     ar = R_pyr(vx, vy, vz, {
       roll:  renderer.roll * (renderer.cameraMode.toLowerCase() == 'fps' ? -1 : 1),
       pitch: -renderer.pitch * (renderer.cameraMode.toLowerCase() == 'fps' ? -1 : 1),
@@ -4299,18 +4586,24 @@ const BasicShader = async (renderer, options=[]) => {
                     uniform float angleOfRefraction2;
                   `,
                   fragCode:            `
-                  
+                  /*
                     float ref2p1, ref2p2, d;
                     float ref2rx = rasterPos.x;
                     float ref2ry = rasterPos.y;
+
+                    float ref2val, ref2x3, ref2y3, ref2z3, ref2dist;
+                    float ref2p1Red =0.0, ref2p2Red = 0.0;
+                    float ref2p1Green = 0.0, ref2p2Green = 0.0;
+                    float ref2p1Blue = 0.0, ref2p2Blue = 0.0;
+                      
                     if(refraction2OmitEquirectangular == 1.0){
                       ref2p1 = rasterPos.x/resolution.x;
                       ref2p2 = rasterPos.y/resolution.y;
                     }else{
                       float ar = resolution.x/resolution.y;
                       float ref2x1 = ref2rx*ar;
-                      float ref2y1 = cos(0.0) * ref2ry;
-                      float ref2z1 = sin(0.0) * ref2ry;
+                      float ref2y1 = ref2ry;
+                      float ref2z1 = 0.0;
 
                       // roll
                       p = atan(ref2x1, ref2y1) - camOri.x;
@@ -4338,8 +4631,8 @@ const BasicShader = async (renderer, options=[]) => {
 
                       float ref2v = 0.83 / (900.0/fov);
                       float ref2x2 = 0.0;
-                      float ref2y2 = sin(0.0) *ref2v;
-                      float ref2z2 = cos(0.0) *ref2v;
+                      float ref2y2 = 0.0;
+                      float ref2z2 = ref2v;
                       
                       // roll
                       p = atan(ref2x2, ref2y2) - camOri.x;
@@ -4358,38 +4651,187 @@ const BasicShader = async (renderer, options=[]) => {
                       d = sqrt( ref2x2 * ref2x2 + ref2z2 * ref2z2 );
                       ref2x2 = sin(p) * d;
                       ref2z2 = cos(p) * d;
+                      
+                      float lowerZ = nVec.z/2.0;
+                      float upperZ = nVec.z;
+                      float rangeZ = upperZ - lowerZ*(abs(angleOfRefraction2)*20.0);
+                      float steps = 5.0;
+                      
+                      for(float k = 0.0; k < 5.0; k++){
+                        
+                        float nVecz = nVec.z + rangeZ / steps * k;
+                        float multRed = 1.0+max(0.0, (sin(M_PI/steps*(k-1.0))-.5))*.3;
+                        float multGreen = 1.0+max(0.0, (sin(M_PI/steps*(k-1.0)+1.0)-.5))*.3;
+                        float multBlue = 1.0+max(0.0, (sin(M_PI/steps*(k-1.0)+M_PI/2.5+1.6)-.5));
+                        
+                        ref2val = 1.0 -
+                           pow(.5 * (-1.66-nVecz), 7.0) * 50.0 * angleOfRefraction2;
+                        ref2x3 = (ref2x1 / ref2val - ref2x2);
+                        ref2y3 = (ref2y1 / ref2val - ref2y2);
+                        ref2z3 = (ref2z1 / ref2val - ref2z2);
+                        ref2dist = sqrt(
+                          ref2x3 * ref2x3 +
+                          ref2y3 * ref2y3 +
+                          ref2z3 * ref2z3
+                        );
+                        ref2p1Red += -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0 / steps * multRed;
+                        ref2p2Red += acos(ref2y3 / ref2dist) / M_PI / steps * multRed;
 
-                      float ref2val = 1.0 -
-                         pow(.5 * (-1.66-nVec.z), 7.0) *
-                           50.0 * 
-                           angleOfRefraction2;
-                               
-                      float ref2x3 = (ref2x1 / ref2val - ref2x2);
-                      float ref2y3 = (ref2y1 / ref2val - ref2y2);
-                      float ref2z3 = (ref2z1 / ref2val - ref2z2);
+                        ref2val = 1.0 -
+                           pow(.5 * (-1.66-nVecz), 7.0) * 50.0 * angleOfRefraction2;
+                        ref2x3 = (ref2x1 / ref2val - ref2x2);
+                        ref2y3 = (ref2y1 / ref2val - ref2y2);
+                        ref2z3 = (ref2z1 / ref2val - ref2z2);
+                        ref2dist = sqrt(
+                          ref2x3 * ref2x3 +
+                          ref2y3 * ref2y3 +
+                          ref2z3 * ref2z3
+                        );
+                        ref2p1Green += -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0 / steps * multGreen;
+                        ref2p2Green += acos(ref2y3 / ref2dist) / M_PI / steps * multGreen;
+
+                        ref2val = 1.0 -
+                           pow(.5 * (-1.66-nVecz), 7.0) * 50.0 * angleOfRefraction2;
+                        ref2x3 = (ref2x1 / ref2val - ref2x2);
+                        ref2y3 = (ref2y1 / ref2val - ref2y2);
+                        ref2z3 = (ref2z1 / ref2val - ref2z2);
+                        ref2dist = sqrt(
+                          ref2x3 * ref2x3 +
+                          ref2y3 * ref2y3 +
+                          ref2z3 * ref2z3
+                        );
+                        ref2p1Blue += -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0 / steps * multBlue;
+                        ref2p2Blue += acos(ref2y3 / ref2dist) / M_PI / steps * multBlue;
+                      }
+                    }
+                    
+                    
+                    vec2 ref2coordsRed   = vec2(ref2p1Red+.5/M_PI/2.0, ref2p2Red);
+                    vec2 ref2coordsGreen = vec2(ref2p1Green+.5/M_PI/2.0, ref2p2Green);
+                    vec2 ref2coordsBlue  = vec2(ref2p1Blue+.5/M_PI/2.0, ref2p2Blue);
+                    float red   = texture2D(refraction2Map, ref2coordsRed).r;
+                    float green = texture2D(refraction2Map, ref2coordsGreen).g;
+                    float blue  = texture2D(refraction2Map, ref2coordsBlue).b;
+                    vec3 rgb = vec3(red, green, blue);
+                    addInColor = merge(addInColor, vec4(rgb * 1.25, refraction2));
+                    */
+                    
+                    
+
+                   float ref2p1, ref2p2, d;
+                    float ref2rx = rasterPos.x;
+                    float ref2ry = rasterPos.y;
+
+                    float ref2val, ref2x3, ref2y3, ref2z3, ref2dist;
+                    float ref2p1Red, ref2p2Red;
+                    float ref2p1Green, ref2p2Green;
+                    float ref2p1Blue, ref2p2Blue;
                       
-                      //p = atan(ref2x3, ref2y3) - camOri.x;
-                      //d = sqrt(ref2x3*ref2x3 + ref2y3*ref2y3);
-                      //ref2x3 = .5 + sin(p) * d;
-                      //ref2y3 = .5 + cos(p) * d;
+                    if(refraction2OmitEquirectangular == 1.0){
+                      ref2p1 = rasterPos.x/resolution.x;
+                      ref2p2 = rasterPos.y/resolution.y;
+                    }else{
+                      float ar = resolution.x/resolution.y;
+                      float ref2x1 = ref2rx*ar;
+                      float ref2y1 = ref2ry;
+                      float ref2z1 = 0.0;
+
+                      // roll
+                      p = atan(ref2x1, ref2y1) - camOri.x;
+                      d = sqrt( ref2x1 * ref2x1 + ref2y1 * ref2y1 );
+                      ref2x1 = sin(p) * d;
+                      ref2y1 = cos(p) * d;
+
+                      // pitch
+                      float p;
+                      if(cameraMode == 1.0){
+                        p = atan(ref2y1, ref2z1) + camOri.y;
+                      }else{
+                        p = atan(ref2y1, ref2z1) - camOri.y;
+                      }
+
+                      float d = sqrt( ref2y1 * ref2y1 + ref2z1 * ref2z1 );
+                      ref2y1 = sin(p) * d;
+                      ref2z1 = cos(p) * d;
+
+                      // yaw
+                      p = atan(-ref2x1, -ref2z1) + camOri.z + .5;
+                      d = sqrt( ref2x1 * ref2x1 + ref2z1 * ref2z1 );
+                      ref2x1 = sin(p) * d;
+                      ref2z1 = cos(p) * d;
+
+                      float ref2v = 0.83 / (900.0/fov);
+                      float ref2x2 = 0.0;
+                      float ref2y2 = 0.0;
+                      float ref2z2 = ref2v;
                       
-                      float ref2dist = sqrt(
+                      // roll
+                      p = atan(ref2x2, ref2y2) - camOri.x;
+                      d = sqrt( ref2x2 * ref2x2 + ref2y2 * ref2y2 );
+                      ref2x2 = sin(p) * d;
+                      ref2y2 = cos(p) * d;
+                      
+                      // pitch
+                      p = atan(ref2y2, ref2z2) - camOri.y * (cameraMode == 1.0 ? -1.0: 1.0);
+                      d = sqrt( ref2y2 * ref2y2 + ref2z2 * ref2z2 );
+                      ref2y2 = sin(p) * d;
+                      ref2z2 = cos(p) * d;
+                      
+                      // yaw
+                      p = atan(-ref2x2, -ref2z2) + camOri.z + .5;
+                      d = sqrt( ref2x2 * ref2x2 + ref2z2 * ref2z2 );
+                      ref2x2 = sin(p) * d;
+                      ref2z2 = cos(p) * d;
+                      
+                      ref2val = 1.0 -
+                         pow(.5 * (-1.66-nVec.z), 7.0) * 50.0 * angleOfRefraction2;
+                      ref2x3 = (ref2x1 / ref2val - ref2x2);
+                      ref2y3 = (ref2y1 / ref2val - ref2y2);
+                      ref2z3 = (ref2z1 / ref2val - ref2z2);
+                      ref2dist = sqrt(
                         ref2x3 * ref2x3 +
                         ref2y3 * ref2y3 +
                         ref2z3 * ref2z3
                       );
-                      
-                    
-                      ref2p1 = -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0;
-                      ref2p2 = acos(ref2y3 / ref2dist) / M_PI;
+                      ref2p1Red = -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0;
+                      ref2p2Red = acos(ref2y3 / ref2dist) / M_PI;
+
+                      ref2val = 1.0 -
+                         pow(.5 * (-1.66-nVec.z/1.033), 7.0) * 50.0 * angleOfRefraction2;
+                      ref2x3 = (ref2x1 / ref2val - ref2x2);
+                      ref2y3 = (ref2y1 / ref2val - ref2y2);
+                      ref2z3 = (ref2z1 / ref2val - ref2z2);
+                      ref2dist = sqrt(
+                        ref2x3 * ref2x3 +
+                        ref2y3 * ref2y3 +
+                        ref2z3 * ref2z3
+                      );
+                      ref2p1Green = -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0;
+                      ref2p2Green = acos(ref2y3 / ref2dist) / M_PI;
+
+                      ref2val = 1.0 -
+                         pow(.5 * (-1.66-nVec.z/1.066), 7.0) * 50.0 * angleOfRefraction2;
+                      ref2x3 = (ref2x1 / ref2val - ref2x2);
+                      ref2y3 = (ref2y1 / ref2val - ref2y2);
+                      ref2z3 = (ref2z1 / ref2val - ref2z2);
+                      ref2dist = sqrt(
+                        ref2x3 * ref2x3 +
+                        ref2y3 * ref2y3 +
+                        ref2z3 * ref2z3
+                      );
+                      ref2p1Blue = -(atan(ref2x3, ref2z3) + refraction2Theta) / M_PI / 2.0;
+                      ref2p2Blue = acos(ref2y3 / ref2dist) / M_PI;
                     }
                     
                     
-                    vec2 ref2coords = vec2(ref2p1+.5/M_PI/2.0, ref2p2);
-                  
-                    addInColor = merge(addInColor, 
-                      vec4(texture2D(refraction2Map,
-                        ref2coords).rgb * 1.25, refraction2));
+                    vec2 ref2coordsRed   = vec2(ref2p1Red+.5/M_PI/2.0, ref2p2Red);
+                    vec2 ref2coordsGreen = vec2(ref2p1Green+.5/M_PI/2.0, ref2p2Green);
+                    vec2 ref2coordsBlue  = vec2(ref2p1Blue+.5/M_PI/2.0, ref2p2Blue);
+                    float red   = texture2D(refraction2Map, ref2coordsRed).r;
+                    float green = texture2D(refraction2Map, ref2coordsGreen).g;
+                    float blue  = texture2D(refraction2Map, ref2coordsBlue).b;
+                    vec3 rgb = vec3(red, green, blue);
+                    addInColor = merge(addInColor, vec4(rgb * 1.25, refraction2));
                   `,
                 }
                 dataset.optionalUniforms.push( uniformOption )
@@ -4424,6 +4866,7 @@ const BasicShader = async (renderer, options=[]) => {
                   fragCode:            `
                     if(isLight == 0.0 &&
                        isSprite == 0.0 &&
+                       shapeArrayIsSprite == 0.0 &&
                        isParticle == 0.0 &&
                        isLine == 0.0){
                       //light.rgb *= .5;
@@ -4519,6 +4962,7 @@ const BasicShader = async (renderer, options=[]) => {
       uniform float splitCheckPass;
       uniform float pointSize;
       uniform float isSprite;
+      uniform float shapeArrayIsSprite;
       uniform float isLight;
       uniform float cameraMode;
       uniform float isParticle;
@@ -4919,6 +5363,7 @@ const BasicShader = async (renderer, options=[]) => {
       uniform float plugin;
       uniform float flatShading;
       uniform float isSprite;
+      uniform float shapeArrayIsSprite;
       uniform float isLight;
       uniform float isParticle;
       uniform float isLine;
@@ -5158,11 +5603,14 @@ const BasicShader = async (renderer, options=[]) => {
               ${uFragCode}
               ${aFragCode}
               
-              vec4 texel = vec4(texture2D( baseTexture, coords).rgb, bMix);
+              vec4 texel = texture2D( baseTexture, coords);
+              texel = vec4(texel.rgb, bMix * texel.a);
               texel = merge(texel, vec4(texture2D( supplementalTexture, coords).rgb, sMix));
 
               float fv;
-              if(isSprite != 0.0 || isLight != 0.0){
+              if(isSprite != 0.0 ||
+                 shapeArrayIsSprite != 0.0 ||
+                 isLight != 0.0){
                 if(fog != 0.0){
                   vec4 preFog = vec4(texel.rgb * 3.0, texel.a);
                   fv = min(1.0, depth * fog) * min(alpha * 2.0, 1.0);
@@ -5649,6 +6097,9 @@ const BasicShader = async (renderer, options=[]) => {
           dset.locIsSprite = gl.getUniformLocation(dset.program, "isSprite")
           gl.uniform1f(dset.locIsSprite, geometry.isSprite ? 1.0 : 0.0)
 
+          dset.locShapeArrayIsSprite = gl.getUniformLocation(dset.program, "shapeArrayIsSprite")
+          gl.uniform1f(dset.locShapeArrayIsSprite, geometry.shapeArrayIsSprite ? 1.0 : 0.0)
+
           dset.locCameraMode = gl.getUniformLocation(dset.program, "cameraMode")
           gl.uniform1f(dset.locCameraMode, renderer.cameraMode.toLowerCase() == 'fps' ? 1.0 : 0.0)
 
@@ -5990,6 +6441,10 @@ const ProcessShapeArray = shape => {
     shape.shapeArrayIsSprite = true
     shape.isSprite = false
   }
+
+  if(shape.shapeArrayIsSprite){
+    shape.disableDepthTest = true
+  }
   
   const SyncShapeData = shpIdx => {
     data[shpIdx].mx = data[shpIdx].x
@@ -6020,22 +6475,36 @@ const ProcessShapeArray = shape => {
       data[shpIdx].moffsetz = data[shpIdx].offsetz
       SyncShapeData(shpIdx)
     }
-    if(data[shpIdx].mx != data[shpIdx].x ||
-       data[shpIdx].my != data[shpIdx].y ||
-       data[shpIdx].mz != data[shpIdx].z ||
-       data[shpIdx].mroll != data[shpIdx].roll ||
-       data[shpIdx].mpitch != data[shpIdx].pitch ||
-       data[shpIdx].myaw != data[shpIdx].yaw){
+    if((shape.shapeArrayIsSprite &&
+       (shape.renderer.x     != shape.renderer.oCamX ||
+        shape.renderer.y     != shape.renderer.oCamY ||
+        shape.renderer.z     != shape.renderer.oCamZ ||
+        shape.renderer.roll  != shape.renderer.oCamRoll ||
+        shape.renderer.pitch != shape.renderer.oCamPitch ||
+        shape.renderer.yaw   != shape.renderer.oCamYaw ||
+        shape.x             != shape.ox ||
+        shape.y             != shape.oy ||
+        shape.z             != shape.oz ||
+        shape.roll          != shape.oRoll ||
+        shape.pitch         != shape.oPitch ||
+        shape.yaw           != shape.oYaw)) ||
+       data[shpIdx].mx      != data[shpIdx].x ||
+       data[shpIdx].my      != data[shpIdx].y ||
+       data[shpIdx].mz      != data[shpIdx].z ||
+       data[shpIdx].mroll   != data[shpIdx].roll ||
+       data[shpIdx].mpitch  != data[shpIdx].pitch ||
+       data[shpIdx].myaw    != data[shpIdx].yaw){
       tx = data[shpIdx].ox
       ty = data[shpIdx].oy
       tz = data[shpIdx].oz
       var roll, pitch, yaw, rotationMode
       if(shape.shapeArrayIsSprite){
-        roll  = (shape.renderer.roll - shape.roll) *
-                    (shape.renderer.cameraMode == 'fps' ? 1 : -1)
-        pitch = (-shape.renderer.pitch + shape.pitch) *
-                    (shape.renderer.cameraMode == 'fps' ? 1 : -1)
-        yaw   = -shape.renderer.yaw - shape.yaw
+        // to-do:
+        // subtract out shapeArray orientation for sprites.
+        // works currently, unless shape is reoriented.
+        pitch = (-shape.renderer.pitch) * (shape.renderer.cameraMode == 'fps' ? 1 : -1) - shape.pitch
+        yaw   = (-shape.renderer.yaw) - shape.yaw
+        roll  = (shape.renderer.roll)  - shape.roll
         rotationMode = 1
       }else{
         roll  = data[shpIdx].roll
@@ -6182,6 +6651,18 @@ const ProcessShapeArray = shape => {
       SyncShapeData(shpIdx)
     }
   }
+  shape.renderer.oCamX     = shape.renderer.x
+  shape.renderer.oCamY     = shape.renderer.y
+  shape.renderer.oCamZ     = shape.renderer.z
+  shape.renderer.oCamRoll  = shape.renderer.roll
+  shape.renderer.oCamPitch = shape.renderer.pitch
+  shape.renderer.oCamYaw   = shape.renderer.yaw
+  shape.oX      = shape.x
+  shape.oY      = shape.y
+  shape.oZ      = shape.z
+  shape.oRoll   = shape.roll
+  shape.oPitch  = shape.pitch
+  shape.oYaw    = shape.yaw
 }
 
 
@@ -6246,7 +6727,8 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     'heightmapIsDataArray', 'heightmapDataArrayFormat',
     'heightmapDataArrayWidth', 'heightmapDataArrayHeight',
     'rebindTextures', 'exportAsOBJ', 'downloadAsOBJ',
-    'resolved','map', 'video', 'muted'
+    'resolved','map', 'video', 'muted', 'partitionSize',
+    'partitionRadius'
   ]).forEach(key => { opts[key] = shape[key] })
   opts.name = shape.name
   Object.keys(options).forEach((key, idx) => {
@@ -6287,6 +6769,7 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     ret = geometry
     ret.shapeData = shapeData
   })
+  
   return ret
 }
 
@@ -8632,7 +9115,8 @@ const LoadFPSControls = async (renderer, options) => {
 const ShouldDisableDepth = shape => {
   //return false
   return ((!shape.isParticle) && (!shape.isLine) &&
-         (shape.isLight || shape.isSprite)) || shape.disableDepthTest
+         (shape.isLight || shape.isSprite ||
+          shape.shapeArrayIsSprite)) || shape.disableDepthTest
 }
 
 const AnimationLoop = (renderer, func) => {
